@@ -1,4 +1,4 @@
-#ifndef MAIN_WINDOW_H_
+﻿#ifndef MAIN_WINDOW_H_
 #define MAIN_WINDOW_H_
 
 #include <Windows.h>
@@ -14,6 +14,7 @@
 #include "view_manager.h"
 #include "adv.h"
 #include "win_timer.h"
+#include "image_info.h"
 
 class CMainWindow
 {

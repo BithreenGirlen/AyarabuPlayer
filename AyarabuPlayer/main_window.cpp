@@ -246,18 +246,18 @@ LRESULT CMainWindow::OnPaint()
         {
             if (m_pViewManager != nullptr)
             {
-                ImageInfo sImageInfo;
-                sImageInfo.uiWidth = sVideoFrame.iWidth;
-                sImageInfo.uiHeight = sVideoFrame.iHeight;
-                sImageInfo.iStride = sVideoFrame.uiStride;
-                sImageInfo.pixels.resize(sVideoFrame.nPixelSize);
-                memcpy(sImageInfo.pixels.data(), sVideoFrame.pPixels, sVideoFrame.nPixelSize);
+                ImageInfo s;
+                s.uiWidth = sVideoFrame.iWidth;
+                s.uiHeight = sVideoFrame.iHeight;
+                s.iStride = sVideoFrame.uiStride;
+                s.pixels.resize(sVideoFrame.nPixelSize);
+                memcpy(s.pixels.data(), sVideoFrame.pPixels, sVideoFrame.nPixelSize);
 
-                bRet = m_pD2ImageDrawer->Draw(sImageInfo, { static_cast<float>(m_pViewManager->GetXOffset()), static_cast<float>(m_pViewManager->GetYOffset()) }, m_pViewManager->GetScale());
+                bRet = m_pD2ImageDrawer->Draw(s.pixels.data(), s.uiWidth, s.uiHeight, s.iStride, {static_cast<float>(m_pViewManager->GetXOffset()), static_cast<float>(m_pViewManager->GetYOffset())}, m_pViewManager->GetScale());
 
                 if (bRet)
                 {
-                    StoreVideoFrame(sVideoFrame.llCurrentTime, sImageInfo);
+                    StoreVideoFrame(sVideoFrame.llCurrentTime, s);
                 }
             }
             free(sVideoFrame.pPixels);
@@ -265,10 +265,10 @@ LRESULT CMainWindow::OnPaint()
         else
         {
             long long llCurrentTime = m_pVideoTransferor->GetCurrentTimeInMilliSeconds();
-            ImageInfo* s = RestoreVideoFrame(llCurrentTime);
+            const ImageInfo* s = RestoreVideoFrame(llCurrentTime);
             if (s != nullptr)
             {
-                bRet = m_pD2ImageDrawer->Draw(*s, { m_pViewManager->GetXOffset(), m_pViewManager->GetYOffset() }, m_pViewManager->GetScale());
+                bRet = m_pD2ImageDrawer->Draw(s->pixels.data(), s->uiWidth, s->uiHeight, s->iStride, {m_pViewManager->GetXOffset(), m_pViewManager->GetYOffset()}, m_pViewManager->GetScale());
             }
         }
     }
@@ -277,7 +277,8 @@ LRESULT CMainWindow::OnPaint()
         const auto& iter = m_imageMap.find(paintDatum.wstrFilePath);
         if (iter != m_imageMap.cend())
         {
-            bRet = m_pD2ImageDrawer->Draw(iter->second, { m_pViewManager->GetXOffset(), m_pViewManager->GetYOffset() }, m_pViewManager->GetScale());
+            const ImageInfo& s = iter->second;
+            bRet = m_pD2ImageDrawer->Draw(s.pixels.data(), s.uiWidth, s.uiHeight, s.iStride, {m_pViewManager->GetXOffset(), m_pViewManager->GetYOffset()}, m_pViewManager->GetScale());
         }
     }
 
