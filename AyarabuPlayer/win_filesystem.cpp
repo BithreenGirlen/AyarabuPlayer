@@ -8,41 +8,8 @@
 
 namespace win_filesystem
 {
-	/*ファイルのメモリ展開*/
-	char* LoadExistingFile(const wchar_t* pwzFilePath, unsigned long* ulSize)
-	{
-		HANDLE hFile = ::CreateFile(pwzFilePath, GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-		if (hFile != INVALID_HANDLE_VALUE)
-		{
-			DWORD dwSize = ::GetFileSize(hFile, nullptr);
-			if (dwSize != INVALID_FILE_SIZE)
-			{
-				char* pBuffer = static_cast<char*>(malloc(static_cast<size_t>(dwSize + 1ULL)));
-				if (pBuffer != nullptr)
-				{
-					DWORD dwRead = 0;
-					BOOL iRet = ::ReadFile(hFile, pBuffer, dwSize, &dwRead, nullptr);
-					if (iRet)
-					{
-						::CloseHandle(hFile);
-						*(pBuffer + dwRead) = '\0';
-						*ulSize = dwRead;
-
-						return pBuffer;
-					}
-					else
-					{
-						free(pBuffer);
-					}
-				}
-			}
-			::CloseHandle(hFile);
-		}
-
-		return nullptr;
-	}
 	/*指定階層のファイル・フォルダ名一覧取得*/
-	bool CreateFilaNameList(const wchar_t* pwzFolderPath, const wchar_t* pwzFileNamePattern, std::vector<std::wstring>& wstrNames)
+	static bool CreateFilaNameList(const wchar_t* pwzFolderPath, const wchar_t* pwzFileNamePattern, std::vector<std::wstring>& wstrNames)
 	{
 		if (pwzFolderPath == nullptr)return false;
 
@@ -60,9 +27,9 @@ namespace win_filesystem
 			wstrPath += L'*';
 		}
 
-		WIN32_FIND_DATA sFindData;
+		WIN32_FIND_DATAW sFindData;
 
-		HANDLE hFind = ::FindFirstFile(wstrPath.c_str(), &sFindData);
+		HANDLE hFind = ::FindFirstFileW(wstrPath.c_str(), &sFindData);
 		if (hFind != INVALID_HANDLE_VALUE)
 		{
 			if (pwzFileNamePattern != nullptr)
@@ -74,7 +41,7 @@ namespace win_filesystem
 					{
 						wstrNames.push_back(sFindData.cFileName);
 					}
-				} while (::FindNextFile(hFind, &sFindData));
+				} while (::FindNextFileW(hFind, &sFindData));
 			}
 			else
 			{
@@ -88,30 +55,30 @@ namespace win_filesystem
 							wstrNames.push_back(sFindData.cFileName);
 						}
 					}
-				} while (::FindNextFile(hFind, &sFindData));
+				} while (::FindNextFileW(hFind, &sFindData));
 			}
 
 			::FindClose(hFind);
 		}
 		return wstrNames.size() > 0;
 	}
-}
+} /* namespace win_filesystem */
 
 /*指定階層のファイル・フォルダ一覧作成*/
 bool win_filesystem::CreateFilePathList(const wchar_t* pwzFolderPath, const wchar_t* pwzFileSpec, std::vector<std::wstring>& paths)
 {
-	if (pwzFolderPath == nullptr || wcslen(pwzFolderPath) == 0)return false;
+	if (pwzFolderPath == nullptr || *pwzFolderPath == L'\0')return false;
 
 	std::wstring wstrParent = pwzFolderPath;
 	if (wstrParent.back() != L'\\')
 	{
-		wstrParent += L"\\";
+		wstrParent += L'\\';
 	}
 	std::vector<std::wstring> wstrNames;
 
 	if (pwzFileSpec != nullptr)
 	{
-		const auto SplitSpecs = [](const wchar_t* pwzFileSpec, std::vector<std::wstring> &specs)
+		const auto SplitSpecs = [](const wchar_t* pwzFileSpec, std::vector<std::wstring>& specs)
 			-> void
 			{
 				std::wstring wstrTemp;
@@ -154,17 +121,19 @@ bool win_filesystem::CreateFilePathList(const wchar_t* pwzFolderPath, const wcha
 		size_t nIndex = i;
 		for (size_t j = i; j < wstrNames.size(); ++j)
 		{
-			if (::StrCmpLogicalW(wstrNames.at(nIndex).c_str(), wstrNames.at(j).c_str()) > 0)
+			if (::StrCmpLogicalW(wstrNames[nIndex].c_str(), wstrNames[j].c_str()) > 0)
 			{
 				nIndex = j;
 			}
 		}
-		std::swap(wstrNames.at(i), wstrNames.at(nIndex));
+		std::swap(wstrNames[i], wstrNames[nIndex]);
 	}
 
-	for (const std::wstring& wstr : wstrNames)
+	for (const std::wstring& wstrName : wstrNames)
 	{
-		paths.push_back(wstrParent + wstr);
+		std::wstring wstrPath = wstrParent;
+		wstrPath += wstrName;
+		paths.push_back(std::move(wstrPath));
 	}
 
 	return paths.size() > 0;
@@ -173,18 +142,16 @@ bool win_filesystem::CreateFilePathList(const wchar_t* pwzFolderPath, const wcha
 bool win_filesystem::GetFilePathListAndIndex(const std::wstring& wstrPath, const wchar_t* pwzFileSpec, std::vector<std::wstring>& paths, size_t* nIndex)
 {
 	std::wstring wstrParent;
-	std::wstring wstrCurrent;
 
 	size_t nPos = wstrPath.find_last_of(L"\\/");
 	if (nPos != std::wstring::npos)
 	{
 		wstrParent = wstrPath.substr(0, nPos);
-		wstrCurrent = wstrPath.substr(nPos + 1);
 	}
 
 	win_filesystem::CreateFilePathList(wstrParent.c_str(), pwzFileSpec, paths);
 
-	auto iter = std::find(paths.begin(), paths.end(), wstrPath);
+	const auto& iter = std::find(paths.begin(), paths.end(), wstrPath);
 	if (iter != paths.end())
 	{
 		*nIndex = std::distance(paths.begin(), iter);
@@ -195,25 +162,42 @@ bool win_filesystem::GetFilePathListAndIndex(const std::wstring& wstrPath, const
 /*文字列としてファイル読み込み*/
 std::string win_filesystem::LoadFileAsString(const wchar_t* pwzFilePath)
 {
-	DWORD ulSize = 0;
-	char* pBuffer = LoadExistingFile(pwzFilePath, &ulSize);
-	if (pBuffer != nullptr)
-	{
-		std::string str;
-		str.resize(ulSize);
-		memcpy(&str[0], pBuffer, ulSize);
+	std::string strResult;
+	HANDLE hFile = INVALID_HANDLE_VALUE;
+	DWORD ulSize = INVALID_FILE_SIZE;
+	DWORD ulRead = 0;
+	BOOL iRet = FALSE;
 
-		free(pBuffer);
-		return str;
+	hFile = ::CreateFileW(pwzFilePath, GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (hFile == INVALID_HANDLE_VALUE)goto end;
+
+	ulSize = ::GetFileSize(hFile, nullptr);
+	if (ulSize == INVALID_FILE_SIZE)goto end;
+
+	strResult.resize(ulSize);
+	iRet = ::ReadFile(hFile, &strResult[0], ulSize, &ulRead, nullptr);
+	/* To suppress warning C28193 */
+	if (iRet == FALSE)goto end;
+
+end:
+	if (hFile != INVALID_HANDLE_VALUE)
+	{
+		::CloseHandle(hFile);
 	}
 
-	return std::string();
+	return strResult;
 }
 
 std::wstring win_filesystem::GetCurrentProcessPath()
 {
-	wchar_t pwzPath[MAX_PATH]{};
-	::GetModuleFileName(nullptr, pwzPath, MAX_PATH);
-	std::wstring::size_type nPos = std::wstring(pwzPath).find_last_of(L"\\/");
-	return std::wstring(pwzPath).substr(0, nPos);
+	wchar_t sBuffer[MAX_PATH]{};
+	DWORD ulLength = ::GetModuleFileNameW(nullptr, sBuffer, MAX_PATH);
+	if (ulLength == 0)return {};
+
+	const wchar_t* p = sBuffer + ulLength;
+	for (; p != sBuffer; --p)
+	{
+		if (*p == L'\\' || *p == L'/')break;
+	}
+	return std::wstring(sBuffer, p - sBuffer);
 }

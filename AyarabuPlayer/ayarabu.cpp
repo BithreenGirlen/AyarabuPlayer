@@ -42,7 +42,7 @@ namespace ayarabu
 	}
 
 	/*脚本ファイル読み取り*/
-	void ReadScript(const std::wstring &wstrFilePath, std::vector<StoryDatum>& storyData)
+	static void ReadScript(const std::wstring& wstrFilePath, std::vector<StoryDatum>& storyData)
 	{
 		std::string strFile = win_filesystem::LoadFileAsString(wstrFilePath.c_str());
 
@@ -58,7 +58,7 @@ namespace ayarabu
 		size_t nCount = 0;
 		for (size_t nRead = 0; nRead < wstrText.size(); ++nRead)
 		{
-			if (wstrText.at(nRead) == L'\0')
+			if (wstrText[nRead] == L'\0')
 			{
 				++nCount;
 				if (!wstrTemp.empty())
@@ -69,7 +69,7 @@ namespace ayarabu
 				continue;
 			}
 
-			wstrTemp.push_back(wstrText.at(nRead));
+			wstrTemp.push_back(wstrText[nRead]);
 			if (nCount > 0)
 			{
 				counts.push_back(nCount);
@@ -89,22 +89,22 @@ namespace ayarabu
 		constexpr int iNarattiveCounts = 4;
 
 		StoryDatum storyDatumBuffer;
-		bool bNarrative = !texts.empty() && texts.at(0).size() > 6;
+		bool bNarrative = !texts.empty() && texts[0].size() > 6;
 		if (bNarrative)
 		{
 			for (size_t i = 0; i < counts.size() && i < texts.size(); ++i)
 			{
 				if (i == 0)
 				{
-					bNarrative = counts.at(i) >= iNarattiveCounts;
+					bNarrative = counts[i] >= iNarattiveCounts;
 				}
 				else
 				{
-					bNarrative = counts.at(i) > iNarattiveCounts;
+					bNarrative = counts[i] > iNarattiveCounts;
 				}
 				if (bNarrative)
 				{
-					storyDatumBuffer.wstrText = texts.at(i);
+					storyDatumBuffer.wstrText = texts[i];
 					storyData.push_back(storyDatumBuffer);
 					storyDatumBuffer = StoryDatum{};
 					continue;
@@ -112,11 +112,11 @@ namespace ayarabu
 
 				if (storyDatumBuffer.wstrName.empty())
 				{
-					storyDatumBuffer.wstrName = texts.at(i);
+					storyDatumBuffer.wstrName = texts[i];
 				}
 				else
 				{
-					storyDatumBuffer.wstrText = texts.at(i);
+					storyDatumBuffer.wstrText = texts[i];
 					storyData.push_back(storyDatumBuffer);
 					storyDatumBuffer = StoryDatum{};
 				}
@@ -128,10 +128,10 @@ namespace ayarabu
 			{
 				if (bNarrative)
 				{
-					storyDatumBuffer.wstrText = texts.at(i);
+					storyDatumBuffer.wstrText = texts[i];
 					storyData.push_back(storyDatumBuffer);
 					storyDatumBuffer = StoryDatum{};
-					if (counts.at(i) <= iNarattiveCounts)
+					if (counts[i] <= iNarattiveCounts)
 					{
 						bNarrative = false;
 					}
@@ -140,15 +140,15 @@ namespace ayarabu
 
 				if (storyDatumBuffer.wstrName.empty())
 				{
-					storyDatumBuffer.wstrName = texts.at(i);
+					storyDatumBuffer.wstrName = texts[i];
 				}
 				else
 				{
-					storyDatumBuffer.wstrText = texts.at(i);
+					storyDatumBuffer.wstrText = texts[i];
 					storyData.push_back(storyDatumBuffer);
 					storyDatumBuffer = StoryDatum{};
 
-					if (counts.at(i) > iNarattiveCounts)
+					if (counts[i] > iNarattiveCounts)
 					{
 						bNarrative = true;
 					}
@@ -163,7 +163,7 @@ namespace ayarabu
 		}
 	}
 	/*音声ファイル名称書式表構築*/
-	void SetupVoiceFileNameFormatInfo(const std::wstring& wstrFilePath)
+	static void SetupVoiceFileNameFormatInfo(const std::wstring& wstrFilePath)
 	{
 		std::string strFile = win_filesystem::LoadFileAsString(wstrFilePath.c_str());
 		if (strFile.empty())return;
@@ -203,66 +203,66 @@ namespace ayarabu
 			formatData.push_back(formatDatum);
 		}
 
-		g_formatData = formatData;
+		g_formatData = std::move(formatData);
 	}
 	/*音声ファイル名称書式探索*/
-	std::string FindVoiceFileFormat(const std::string& strKey)
+	static std::string FindVoiceFileFormat(const std::string& strKey)
 	{
 		for (size_t i = 0; i < g_formatData.size(); ++i)
 		{
-			if (g_formatData.at(i).at(0) == strKey)
+			if (g_formatData[i].size() > 2 && g_formatData[i][0] == strKey)
 			{
-				return g_formatData.at(i).at(1);
+				return g_formatData[i][1];
 			}
 		}
 		return std::string();
 	}
 
-	std::wstring DeriveSoundMasterDataPathFromScriptFilePath(const std::wstring& wstrFilePath)
+	static std::wstring DeriveSoundMasterDataPathFromScriptFilePath(const std::wstring& wstrFilePath)
 	{
 		size_t nPos = wstrFilePath.rfind(L"r18");
 		if (nPos == std::wstring::npos)return std::wstring();
 
-		return wstrFilePath.substr(0, nPos) + LR"(mock\master_data\sound\SoundVoiceFormatMasterDatas.any)";
+		return wstrFilePath.substr(0, nPos).append(LR"(mock\master_data\sound\SoundVoiceFormatMasterDatas.any)");
 	}
 	/*脚本ファイル経路=>静画階層*/
-	std::wstring DeriveStillImageFolderPathFromScriptFilePath(const std::wstring& wstrFilePath)
+	static std::wstring DeriveStillImageFolderPathFromScriptFilePath(const std::wstring& wstrFilePath)
 	{
 		size_t nPos = wstrFilePath.rfind(L"eventdata\\eventdata");
 		if (nPos == std::wstring::npos)return std::wstring();
 
-		return wstrFilePath.substr(0, nPos) + LR"(advstill)";
+		return wstrFilePath.substr(0, nPos).append(LR"(advstill)");
 	}
 	/*脚本ファイル経路=>動画階層*/
-	std::wstring DeriveVideoFolderPathFromScriptFilePath(const std::wstring& wstrFilePath)
+	static std::wstring DeriveVideoFolderPathFromScriptFilePath(const std::wstring& wstrFilePath)
 	{
 		size_t nPos = wstrFilePath.rfind(L"adventure");
 		if (nPos == std::wstring::npos)return std::wstring();
 
-		return wstrFilePath.substr(0, nPos) + LR"(movie\harem)";
+		return wstrFilePath.substr(0, nPos).append(LR"(movie\harem)");
 	}
-	
-	std::wstring DeriveVoiceFolderPathFromScriptFilePath(const std::wstring& wstrFilePath)
+
+	static std::wstring DeriveVoiceFolderPathFromScriptFilePath(const std::wstring& wstrFilePath)
 	{
 		size_t nPos = wstrFilePath.rfind(L"adventure");
 		if (nPos == std::wstring::npos)return std::wstring();
 
-		return wstrFilePath.substr(0, nPos) + LR"(sound\voice)";
+		return wstrFilePath.substr(0, nPos).append(LR"(sound\voice)");
 	}
 	/*基底ID=>書式ID*/
-	std::string BaseIdToFormatId(long long llBaseId)
+	static std::string BaseIdToFormatId(long long llBaseId)
 	{
-		return std::to_string(llBaseId) + "10001";
+		return std::to_string(llBaseId).append("10001");
 	}
 	/*基底ID=>静画・動画ID*/
-	std::wstring BaseIdToStillOrVideoId(long long llBaseId)
+	static std::wstring BaseIdToStillOrVideoId(long long llBaseId)
 	{
 		wchar_t swzBuffer[5]{};
 		swprintf_s(swzBuffer, L"%04lld", llBaseId);
 		return swzBuffer;
 	}
 	/*脚本ファイル名から基底ID抽出*/
-	long long ExtractIdFromScriptFileName(const std::wstring& wstrFilePath)
+	static long long ExtractIdFromScriptFileName(const std::wstring& wstrFilePath)
 	{
 		constexpr wchar_t swzStart[] = L"eventdata";
 		constexpr wchar_t swzEnd[] = L"03.evsc";
@@ -314,7 +314,7 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 	text_utility::ReplaceAll(strFilePathFormat, "ep{1}", "ep");
 
 	std::vector<std::wstring> voiceFilePaths;
-	std::wstring wstrFolderPath = g_wstrVoiceFolderPath + L"\\" +  win_text::WidenUtf8(strFilePathFormat) + L"3";
+	std::wstring wstrFolderPath = g_wstrVoiceFolderPath + L"\\" + win_text::WidenUtf8(strFilePathFormat) + L"3";
 	win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".m4a", voiceFilePaths);
 	size_t nIntroVoiceFileCount = voiceFilePaths.size();
 	wstrFolderPath.back() = L'4';
@@ -325,9 +325,9 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 		{
 			for (long long i = storyData.size() - 1; i >= 0; --i)
 			{
-				if (!storyData.at(i).wstrName.empty() && storyData.at(i).wstrName.find(L"雄二") == std::wstring::npos)
+				if (!storyData[i].wstrName.empty() && storyData[i].wstrName.find(L"雄二") == std::wstring::npos)
 				{
-					return storyData.at(i).wstrName;
+					return storyData[i].wstrName;
 				}
 			}
 			return std::wstring();
@@ -335,10 +335,10 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 
 	std::wstring wstrMainCharacterName = FindMainCharacterName();
 
-	size_t nFilePathIndex = voiceFilePaths.size() -1;
+	size_t nFilePathIndex = voiceFilePaths.size() - 1;
 	for (long long i = storyData.size() - 1; i >= 0; --i)
 	{
-		StoryDatum& storyDatum = storyData.at(i);
+		const StoryDatum& storyDatum = storyData[i];
 		adv::TextDatum textDatum;
 		if (!storyDatum.wstrName.empty())
 		{
@@ -350,7 +350,7 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 		{
 			if (nFilePathIndex < voiceFilePaths.size())
 			{
-				textDatum.wstrVoicePath = voiceFilePaths.at(nFilePathIndex);
+				textDatum.wstrVoicePath = voiceFilePaths[nFilePathIndex];
 				--nFilePathIndex;
 			}
 		}
@@ -373,7 +373,7 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 	win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".png", stillImageFilePaths);
 
 	stillImageFilePaths.erase(std::remove_if(stillImageFilePaths.begin(), stillImageFilePaths.end(),
-		[](const std::wstring &wstr)
+		[](const std::wstring& wstr)
 		-> bool
 		{
 			return wstr.find(L'#') != std::wstring::npos;
@@ -402,8 +402,8 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 			{
 				adv::PaintDatum imageDatum;
 				imageDatum.bIsVideo = false;
-				imageDatum.wstrFilePath = stillImageFilePaths.at(i);
-				paintData.push_back(imageDatum);
+				imageDatum.wstrFilePath = stillImageFilePaths[i];
+				paintData.push_back(std::move(imageDatum));
 			}
 
 			for (const auto& path : videoFilePaths)
@@ -411,19 +411,19 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 				adv::PaintDatum imageDatum;
 				imageDatum.bIsVideo = true;
 				imageDatum.wstrFilePath = path;
-				paintData.push_back(imageDatum);
+				paintData.push_back(std::move(imageDatum));
 			}
 
 			paintData.emplace_back(adv::PaintDatum{ false, stillImageFilePaths.back() });
 		}
 		else
 		{
-			for (size_t i = 0; i < stillImageFilePaths.size()/2; ++i)
+			for (size_t i = 0; i < stillImageFilePaths.size() / 2; ++i)
 			{
 				adv::PaintDatum imageDatum;
 				imageDatum.bIsVideo = false;
-				imageDatum.wstrFilePath = stillImageFilePaths.at(i);
-				paintData.push_back(imageDatum);
+				imageDatum.wstrFilePath = stillImageFilePaths[i];
+				paintData.push_back(std::move(imageDatum));
 			}
 
 			for (const auto& path : videoFilePaths)
@@ -431,15 +431,15 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 				adv::PaintDatum imageDatum;
 				imageDatum.bIsVideo = true;
 				imageDatum.wstrFilePath = path;
-				paintData.push_back(imageDatum);
+				paintData.push_back(std::move(imageDatum));
 			}
 
 			for (size_t i = stillImageFilePaths.size() / 2; i < stillImageFilePaths.size(); ++i)
 			{
 				adv::PaintDatum imageDatum;
 				imageDatum.bIsVideo = false;
-				imageDatum.wstrFilePath = stillImageFilePaths.at(i);
-				paintData.push_back(imageDatum);
+				imageDatum.wstrFilePath = stillImageFilePaths[i];
+				paintData.push_back(std::move(imageDatum));
 			}
 		}
 	}

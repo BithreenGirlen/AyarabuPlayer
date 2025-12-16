@@ -238,7 +238,7 @@ LRESULT CMainWindow::OnPaint()
 	}
 
 	bool bRet = false;
-	const adv::PaintDatum& paintDatum = m_paintData.at(m_nPaintIndex);
+	const adv::PaintDatum& paintDatum = m_paintData[m_nPaintIndex];
 	if (paintDatum.bIsVideo)
 	{
 		CMfVideoTransferor::SVideoFrame sVideoFrame{};
@@ -586,7 +586,7 @@ void CMainWindow::MenuOnNextFile()
 
 	++m_nScriptFilePathIndex;
 	if (m_nScriptFilePathIndex >= m_scriptFilePaths.size())m_nScriptFilePathIndex = 0;
-	SetupScenario(m_scriptFilePaths.at(m_nScriptFilePathIndex).c_str());
+	SetupScenario(m_scriptFilePaths[m_nScriptFilePathIndex].c_str());
 }
 /*前ファイルに移動*/
 void CMainWindow::MenuOnForeFile()
@@ -595,7 +595,7 @@ void CMainWindow::MenuOnForeFile()
 
 	--m_nScriptFilePathIndex;
 	if (m_nScriptFilePathIndex >= m_scriptFilePaths.size())m_nScriptFilePathIndex = m_scriptFilePaths.size() - 1;
-	SetupScenario(m_scriptFilePaths.at(m_nScriptFilePathIndex).c_str());
+	SetupScenario(m_scriptFilePaths[m_nScriptFilePathIndex].c_str());
 }
 /*音声ループ設定変更*/
 void CMainWindow::MenuOnAudioLoop()
@@ -670,15 +670,18 @@ void CMainWindow::MenuOnVideoSetting()
 /*標題変更*/
 void CMainWindow::ChangeWindowTitle(const wchar_t* pzTitle)
 {
-	std::wstring wstr;
-	if (pzTitle != nullptr)
+	const wchar_t* pwzName = pzTitle;
+	if (pwzName != nullptr)
 	{
-		std::wstring wstrTitle = pzTitle;
-		size_t pos = wstrTitle.find_last_of(L"\\/");
-		wstr = pos == std::wstring::npos ? wstrTitle : wstrTitle.substr(pos + 1);
+		for (;;)
+		{
+			const wchar_t* pPos = wcspbrk(pwzName, L"\\/");
+			if (pPos == nullptr)break;
+			pwzName = pPos + 1;
+		}
 	}
 
-	::SetWindowTextW(m_hWnd, wstr.empty() ? m_swzDefaultWindowName : wstr.c_str());
+	::SetWindowTextW(m_hWnd, (pwzName == nullptr || *pwzName == L'\0') ? m_swzDefaultWindowName : pwzName);
 }
 /*表示形式変更*/
 void CMainWindow::SwitchWindowMode()
@@ -772,7 +775,7 @@ void CMainWindow::UpdatePaintData()
 {
 	if (m_nPaintIndex >= m_paintData.size())return;
 
-	const adv::PaintDatum& paintDatum = m_paintData.at(m_nPaintIndex);
+	const adv::PaintDatum& paintDatum = m_paintData[m_nPaintIndex];
 	if (paintDatum.bIsVideo)
 	{
 		ClearStoeredVideoFrame();
@@ -820,7 +823,7 @@ void CMainWindow::UpdateText()
 {
 	if (m_nTextIndex < m_textData.size())
 	{
-		const adv::TextDatum& t = m_textData.at(m_nTextIndex);
+		const adv::TextDatum& t = m_textData[m_nTextIndex];
 		if (!t.wstrVoicePath.empty())
 		{
 			if (m_pAudioPlayer != nullptr)
@@ -844,10 +847,10 @@ std::wstring CMainWindow::FormatCurrentText()
 {
 	if (m_nTextIndex > m_textData.size() - 1)return std::wstring();
 
-	const adv::TextDatum& t = m_textData.at(m_nTextIndex);
+	const adv::TextDatum& t = m_textData[m_nTextIndex];
 	std::wstring wstr = t.wstrText;
 	if (!wstr.empty() && wstr.back() != L'\n')wstr.push_back(L'\n');
-	wstr += std::to_wstring(m_nTextIndex + 1) + L"/" + std::to_wstring(m_textData.size());
+	wstr += std::to_wstring(m_nTextIndex + 1).append(L"/").append(std::to_wstring(m_textData.size()));
 	return wstr;
 }
 
