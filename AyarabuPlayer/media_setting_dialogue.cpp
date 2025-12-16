@@ -34,21 +34,26 @@ bool CMediaSettingDialogue::Open(HINSTANCE hInstance, HWND hWnd, void* pMediaPla
     wcex.cbClsExtra = 0;
     wcex.cbWndExtra = 0;
     wcex.hInstance = hInstance;
-    //wcex.hIcon = ::LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_APP));
     wcex.hCursor = ::LoadCursor(nullptr, IDC_ARROW);
     wcex.hbrBackground = GetSysColorBrush(COLOR_BTNFACE);
-    //wcex.lpszMenuName = MAKEINTRESOURCEW(IDI_ICON_APP);
     wcex.lpszClassName = m_swzClassName;
-    //wcex.hIconSm = ::LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_ICON_APP));
 
     if (::RegisterClassExW(&wcex))
     {
         m_hInstance = hInstance;
-        m_hParentWnd = hWnd;
         m_pMediaPlayer = pMediaPlayer;
 
+        UINT uiDpi = ::GetDpiForSystem();
+        int iWindowWidth = ::MulDiv(100, uiDpi, USER_DEFAULT_SCREEN_DPI);
+        int iWindowHeight = ::MulDiv(200, uiDpi, USER_DEFAULT_SCREEN_DPI);
+
+        RECT rect{};
+        ::GetClientRect(hWnd, &rect);
+        POINT ownerPos{ rect.left, rect.top };
+        ::ClientToScreen(hWnd, &ownerPos);
+
         m_hWnd = ::CreateWindowW(m_swzClassName, pwzWindowName, WS_OVERLAPPEDWINDOW & ~ WS_MINIMIZEBOX & ~ WS_MAXIMIZEBOX & ~WS_THICKFRAME,
-            CW_USEDEFAULT, CW_USEDEFAULT, 100, 200, hWnd, nullptr, hInstance, this);
+            ownerPos.x, ownerPos.y, iWindowWidth, iWindowHeight, hWnd, nullptr, hInstance, this);
         if (m_hWnd != nullptr)
         {
             MessageLoop();
@@ -150,7 +155,7 @@ LRESULT CMediaSettingDialogue::OnCreate(HWND hWnd)
 
     ::ShowWindow(hWnd, SW_NORMAL);
 
-    ::EnableWindow(m_hParentWnd, FALSE);
+    ::EnableWindow(::GetWindow(m_hWnd, GW_OWNER), FALSE);
 
     ::EnumChildWindows(m_hWnd, SetFontCallback, reinterpret_cast<LPARAM>(m_hFont));
 
@@ -165,8 +170,9 @@ LRESULT CMediaSettingDialogue::OnDestroy()
 /*WM_CLOSE*/
 LRESULT CMediaSettingDialogue::OnClose()
 {
-    ::EnableWindow(m_hParentWnd, TRUE);
-    ::BringWindowToTop(m_hParentWnd);
+    HWND hOwnerWnd = ::GetWindow(m_hWnd, GW_OWNER);
+    ::EnableWindow(hOwnerWnd, TRUE);
+    ::BringWindowToTop(hOwnerWnd);
 
     ::DestroyWindow(m_hWnd);
     ::UnregisterClassW(m_swzClassName, m_hInstance);

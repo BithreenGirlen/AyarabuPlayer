@@ -35,19 +35,20 @@ bool CMainWindow::Create(HINSTANCE hInstance)
     wcex.cbClsExtra = 0;
     wcex.cbWndExtra = 0;
     wcex.hInstance = hInstance;
-    //wcex.hIcon = ::LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_APP));
     wcex.hCursor = ::LoadCursor(nullptr, IDC_ARROW);
     wcex.hbrBackground = ::GetSysColorBrush(COLOR_BTNFACE);
-    //wcex.lpszMenuName = MAKEINTRESOURCEW(IDI_ICON_APP);
     wcex.lpszClassName = m_swzClassName;
-    //wcex.hIconSm = ::LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_ICON_APP));
 
     if (::RegisterClassExW(&wcex))
     {
         m_hInstance = hInstance;
 
-        m_hWnd = ::CreateWindowW(m_swzClassName, m_wstrWindowName.c_str(), WS_OVERLAPPEDWINDOW & ~WS_MINIMIZEBOX & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
-            CW_USEDEFAULT, CW_USEDEFAULT, 200, 200, nullptr, nullptr, hInstance, this);
+        UINT uiDpi = ::GetDpiForSystem();
+        int iWindowWidth = ::MulDiv(200, uiDpi, USER_DEFAULT_SCREEN_DPI);
+        int iWindowHeight = ::MulDiv(200, uiDpi, USER_DEFAULT_SCREEN_DPI);
+
+        m_hWnd = ::CreateWindowW(m_swzClassName, m_swzDefaultWindowName, WS_OVERLAPPEDWINDOW & ~WS_MINIMIZEBOX & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
+            CW_USEDEFAULT, CW_USEDEFAULT, iWindowWidth, iWindowHeight, nullptr, nullptr, hInstance, this);
         if (m_hWnd != nullptr)
         {
             return true;
@@ -669,7 +670,7 @@ void CMainWindow::ChangeWindowTitle(const wchar_t* pzTitle)
         wstr = pos == std::wstring::npos ? wstrTitle : wstrTitle.substr(pos + 1);
     }
 
-    ::SetWindowTextW(m_hWnd, wstr.empty() ? m_wstrWindowName.c_str() : wstr.c_str());
+    ::SetWindowTextW(m_hWnd, wstr.empty() ? m_swzDefaultWindowName : wstr.c_str());
 }
 /*表示形式変更*/
 void CMainWindow::SwitchWindowMode()

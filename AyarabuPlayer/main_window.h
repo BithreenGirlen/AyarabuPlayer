@@ -21,12 +21,14 @@ class CMainWindow
 public:
 	CMainWindow();
 	~CMainWindow();
+
 	bool Create(HINSTANCE hInstance);
 	int MessageLoop();
+
 	HWND GetHwnd()const { return m_hWnd;}
 private:
 	const wchar_t* m_swzClassName = L"Ayarabu player window";
-	std::wstring m_wstrWindowName = L"Ayarabu player";
+	const wchar_t* m_swzDefaultWindowName = L"Ayarabu player";
 	HINSTANCE m_hInstance = nullptr;
 	HWND m_hWnd = nullptr;
 

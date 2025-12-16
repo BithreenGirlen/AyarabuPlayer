@@ -1,4 +1,4 @@
-#ifndef MEDIA_SETTING_DIALOGUE_H_
+﻿#ifndef MEDIA_SETTING_DIALOGUE_H_
 #define MEDIA_SETTING_DIALOGUE_H_
 
 #include <Windows.h>
@@ -8,14 +8,16 @@ class CMediaSettingDialogue
 public:
 	CMediaSettingDialogue();
 	~CMediaSettingDialogue();
+
 	bool Open(HINSTANCE hInstance, HWND hWnd, void* pMediaPlayer, const wchar_t* pwzWindowName);
 	int MessageLoop();
+
 	HWND GetHwnd()const { return m_hWnd; }
 private:
 	const wchar_t* m_swzClassName = L"Media player setting dialogue";
 	HINSTANCE m_hInstance = nullptr;
 	HWND m_hWnd = nullptr;
-	HWND m_hParentWnd = nullptr;
+
 	void* m_pMediaPlayer = nullptr;
 
 	static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
