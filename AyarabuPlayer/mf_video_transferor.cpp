@@ -20,13 +20,13 @@ bool CMfVideoTransferor::TransferVideoFrame(SVideoFrame* pVideoFrame)
 {
 	if (pVideoFrame == nullptr)return false;
 
-	if (m_pmfEngineEx != nullptr)
+	if (m_pMfEngineEx != nullptr)
 	{
-		BOOL iRet = m_pmfEngineEx->HasVideo();
+		BOOL iRet = m_pMfEngineEx->HasVideo();
 		if (iRet)
 		{
 			long long llReadyFrame = 0;
-			HRESULT hr = m_pmfEngineEx->OnVideoStreamTick(&llReadyFrame);
+			HRESULT hr = m_pMfEngineEx->OnVideoStreamTick(&llReadyFrame);
 			if (SUCCEEDED(hr) && llReadyFrame >= 0)
 			{
 				pVideoFrame->llCurrentTime = GetCurrentTimeInMilliSeconds();
@@ -44,7 +44,7 @@ bool CMfVideoTransferor::TransferVideoFrame(SVideoFrame* pVideoFrame)
 				dstRect.bottom = ulDestHeight;
 				MFARGB bg{ 0, 0, 0, 0 };
 				MFVideoNormalizedRect normalisedRect{};
-				hr = m_pmfEngineEx->TransferVideoFrame(m_pWicBitmap, &normalisedRect, &dstRect, &bg);
+				hr = m_pMfEngineEx->TransferVideoFrame(m_pWicBitmap, &normalisedRect, &dstRect, &bg);
 				if (FAILED(hr))return false;
 
 				unsigned int uiWidth = 0;
