@@ -50,7 +50,7 @@ namespace ayarabu
 		if (strFile.size() <= kTextOffset + 4ULL)return;
 
 		unsigned long ulPos = ToUInt32(&strFile[kTextOffset]);
-		std::wstring wstrText = win_text::WidenUtf8(strFile.substr(ulPos));
+		std::wstring wstrText = win_text::WidenUtf8(&strFile[ulPos], static_cast<int>(strFile.size() - ulPos));
 
 		std::vector<size_t> counts;
 		std::vector<std::wstring> texts;
@@ -200,7 +200,7 @@ namespace ayarabu
 				formatDatum.push_back(vBuffer.data());
 			}
 
-			formatData.push_back(formatDatum);
+			formatData.push_back(std::move(formatDatum));
 		}
 
 		g_formatData = std::move(formatData);
@@ -225,29 +225,21 @@ namespace ayarabu
 
 		return wstrFilePath.substr(0, nPos).append(LR"(mock\master_data\sound\SoundVoiceFormatMasterDatas.any)");
 	}
-	/*脚本ファイル経路=>静画階層*/
-	static std::wstring DeriveStillImageFolderPathFromScriptFilePath(const std::wstring& wstrFilePath)
+	/* 脚本ファイル経路から各種資源階層導出 */
+	static bool DeriveResourceFolderPathsFromScriptFilePath(const std::wstring& wstrFilePath)
 	{
-		size_t nPos = wstrFilePath.rfind(L"eventdata\\eventdata");
-		if (nPos == std::wstring::npos)return std::wstring();
+		size_t nAdvPos = wstrFilePath.rfind(L"adventure");
+		if (nAdvPos == std::wstring::npos)return false;
 
-		return wstrFilePath.substr(0, nPos).append(LR"(advstill)");
-	}
-	/*脚本ファイル経路=>動画階層*/
-	static std::wstring DeriveVideoFolderPathFromScriptFilePath(const std::wstring& wstrFilePath)
-	{
-		size_t nPos = wstrFilePath.rfind(L"adventure");
-		if (nPos == std::wstring::npos)return std::wstring();
+		size_t nEventDataPos = wstrFilePath.rfind(L"eventdata\\eventdata");
+		if (nEventDataPos == std::wstring::npos)return false;
 
-		return wstrFilePath.substr(0, nPos).append(LR"(movie\harem)");
-	}
+		g_wstrStillFolderPath.assign(&wstrFilePath[0], nEventDataPos).append(LR"(advstill)");
 
-	static std::wstring DeriveVoiceFolderPathFromScriptFilePath(const std::wstring& wstrFilePath)
-	{
-		size_t nPos = wstrFilePath.rfind(L"adventure");
-		if (nPos == std::wstring::npos)return std::wstring();
+		g_wstrVideoFolderPath.assign(&wstrFilePath[0], nAdvPos).append(LR"(movie\harem)");
+		g_wstrVoiceFolderPath.assign(&wstrFilePath[0], nAdvPos).append(LR"(sound\voice)");
 
-		return wstrFilePath.substr(0, nPos).append(LR"(sound\voice)");
+		return !g_wstrStillFolderPath.empty() && !g_wstrVideoFolderPath.empty() && !g_wstrVoiceFolderPath.empty();
 	}
 	/*基底ID=>書式ID*/
 	static std::string BaseIdToFormatId(long long llBaseId)
@@ -290,13 +282,8 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 		SetupVoiceFileNameFormatInfo(wstrVoiceMasterDataFilePath);
 		if (g_formatData.empty())return false;
 
-		g_wstrStillFolderPath = DeriveStillImageFolderPathFromScriptFilePath(wstrFilePath);
-		g_wstrVideoFolderPath = DeriveVideoFolderPathFromScriptFilePath(wstrFilePath);
-		g_wstrVoiceFolderPath = DeriveVoiceFolderPathFromScriptFilePath(wstrFilePath);
+		if (!DeriveResourceFolderPathsFromScriptFilePath(wstrFilePath))return false;
 	}
-
-	if (g_wstrStillFolderPath.empty() || g_wstrVideoFolderPath.empty() ||
-		g_wstrVoiceFolderPath.empty() || g_formatData.empty())return false;
 
 	long long llBaseId = ExtractIdFromScriptFileName(wstrFilePath);
 	if (llBaseId <= 0)return false;
@@ -314,8 +301,10 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 	text_utility::ReplaceAll(strFilePathFormat, "ep{1}", "ep");
 
 	std::vector<std::wstring> voiceFilePaths;
-	std::wstring wstrFolderPath = g_wstrVoiceFolderPath + L"\\" + win_text::WidenUtf8(strFilePathFormat) + L"3";
+	std::wstring wstrFolderPath = g_wstrVoiceFolderPath;
+	wstrFolderPath.append(L"\\").append(win_text::WidenUtf8(strFilePathFormat)).push_back('3');
 	win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".m4a", voiceFilePaths);
+
 	size_t nIntroVoiceFileCount = voiceFilePaths.size();
 	wstrFolderPath.back() = L'4';
 	win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".m4a", voiceFilePaths);
@@ -369,7 +358,7 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 	std::wstring wstrImageId = BaseIdToStillOrVideoId(llBaseId);
 
 	std::vector<std::wstring> stillImageFilePaths;
-	wstrFolderPath = g_wstrStillFolderPath + L"\\advstill" + wstrImageId;
+	wstrFolderPath.assign(g_wstrStillFolderPath).append(L"\\advstill").append(wstrImageId);
 	win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".png", stillImageFilePaths);
 
 	stillImageFilePaths.erase(std::remove_if(stillImageFilePaths.begin(), stillImageFilePaths.end(),
@@ -380,7 +369,7 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 		}), stillImageFilePaths.end());
 
 	std::vector<std::wstring> videoFilePaths;
-	wstrFolderPath = g_wstrVideoFolderPath + L"\\chara" + wstrImageId;
+	wstrFolderPath.assign(g_wstrVideoFolderPath).append(L"\\chara").append(wstrImageId);
 	win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".mp4", videoFilePaths);
 
 	/*
