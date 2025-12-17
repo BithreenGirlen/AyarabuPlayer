@@ -8,7 +8,6 @@
 #pragma comment (lib,"dxguid.lib")
 
 CD2ImageDrawer::CD2ImageDrawer(HWND hWnd)
-	:m_hRetWnd(hWnd)
 {
 	m_hrComInit = ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 	if (FAILED(m_hrComInit))return;
@@ -51,7 +50,7 @@ CD2ImageDrawer::CD2ImageDrawer(HWND hWnd)
 	desc.BufferCount = 1;
 	desc.SwapEffect = DXGI_SWAP_EFFECT_SEQUENTIAL;
 
-	hr = pDxgiFactory2->CreateSwapChainForHwnd(pDxgDevice1, m_hRetWnd, &desc, nullptr, nullptr, &m_pDxgiSwapChain1);
+	hr = pDxgiFactory2->CreateSwapChainForHwnd(pDxgDevice1, hWnd, &desc, nullptr, nullptr, &m_pDxgiSwapChain1);
 	if (FAILED(hr))return;
 
 	m_pD2d1DeviceContext->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
@@ -139,14 +138,16 @@ bool CD2ImageDrawer::Draw(const void* srcData, const UINT32 width, const UINT32 
 bool CD2ImageDrawer::Draw(ID2D1Bitmap* pD2d1Bitmap, const D2D_VECTOR_2F fOffset, float fScale)
 {
 	if (pD2d1Bitmap == nullptr)return false;
-	HRESULT hr = E_FAIL;
 
 	D2D1_SIZE_U s = pD2d1Bitmap->GetPixelSize();
 	bool bRet = CheckBitmapSize(s.width, s.height);
 	if (!bRet)return false;
 
+	bRet = CheckBufferSize();
+	if (!bRet)return false;
+
 	CComPtr<ID2D1Effect> pD2d1Effect;
-	hr = m_pD2d1DeviceContext->CreateEffect(CLSID_D2D1Scale, &pD2d1Effect);
+	HRESULT hr = m_pD2d1DeviceContext->CreateEffect(CLSID_D2D1Scale, &pD2d1Effect);
 
 	pD2d1Effect->SetInput(0, pD2d1Bitmap);
 	hr = pD2d1Effect->SetValue(D2D1_SCALE_PROP_CENTER_POINT, fOffset);
@@ -211,28 +212,37 @@ bool CD2ImageDrawer::CreateBitmapForDrawing(unsigned long uiWidth, unsigned long
 /*原版寸法確認*/
 bool CD2ImageDrawer::CheckBufferSize()
 {
-	RECT rc;
-	::GetClientRect(m_hRetWnd, &rc);
-
-	unsigned int uiWidth = rc.right - rc.left;
-	unsigned int uiHeight = rc.bottom - rc.top;
-
-	if (m_uiWindowWidth != uiWidth || m_uiWindowHeight != uiHeight)
+	if (m_pDxgiSwapChain1 != nullptr)
 	{
-		m_uiWindowWidth = uiWidth;
-		m_uiWindowHeight = uiHeight;
-		return ResizeBuffer();
+		HWND hWnd = nullptr;
+		m_pDxgiSwapChain1->GetHwnd(&hWnd);
+		if (hWnd != nullptr)
+		{
+			RECT rc;
+			::GetClientRect(hWnd, &rc);
+
+			unsigned int uiWidth = rc.right - rc.left;
+			unsigned int uiHeight = rc.bottom - rc.top;
+
+			if (m_uiWindowWidth != uiWidth || m_uiWindowHeight != uiHeight)
+			{
+				m_uiWindowWidth = uiWidth;
+				m_uiWindowHeight = uiHeight;
+				return ResizeBuffer();
+			}
+			else
+			{
+				return true;
+			}
+		}
 	}
-	else
-	{
-		return true;
-	}
+
 	return false;
 }
 /*原版寸法変更*/
 bool CD2ImageDrawer::ResizeBuffer()
 {
-	if (m_pDxgiSwapChain1 != nullptr && m_pD2d1DeviceContext != nullptr && m_hRetWnd != nullptr)
+	if (m_pDxgiSwapChain1 != nullptr && m_pD2d1DeviceContext != nullptr)
 	{
 		m_pD2d1DeviceContext->SetTarget(nullptr);
 
