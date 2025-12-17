@@ -86,33 +86,28 @@ void CViewManager::ResizeWindow()
 {
 	if (m_hRetWnd != nullptr)
 	{
-		bool bBarHidden = IsWidowBarHidden();
-		RECT rect;
-		if (!bBarHidden)
-		{
-			::GetWindowRect(m_hRetWnd, &rect);
-		}
-		else
-		{
-			::GetClientRect(m_hRetWnd, &rect);
-		}
+		const auto IsWidowBarHidden = [this]()
+			-> bool
+			{
+				if (m_hRetWnd != nullptr)
+				{
+					LONG lStyle = ::GetWindowLong(m_hRetWnd, GWL_STYLE);
+					return !((lStyle & WS_CAPTION) && (lStyle & WS_SYSMENU));
+				}
+				return false;
+			};
 
+		RECT rect;
+		::GetWindowRect(m_hRetWnd, &rect);
 		int iX = static_cast<int>(m_uiBaseWidth * m_fScale);
 		int iY = static_cast<int>(m_uiBaseHeight * m_fScale);
+
 		rect.right = iX + rect.left;
 		rect.bottom = iY + rect.top;
-		if (!bBarHidden)
-		{
-			LONG lStyle = ::GetWindowLong(m_hRetWnd, GWL_STYLE);
-			::AdjustWindowRect(&rect, lStyle, TRUE);
-			::SetWindowPos(m_hRetWnd, HWND_TOP, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOMOVE | SWP_NOZORDER);
-		}
-		else
-		{
-			RECT rc;
-			::GetWindowRect(m_hRetWnd, &rc);
-			::MoveWindow(m_hRetWnd, rc.left, rc.top, rect.right, rect.bottom, TRUE);
-		}
+		LONG lStyle = ::GetWindowLong(m_hRetWnd, GWL_STYLE);
+		bool bBarHidden = IsWidowBarHidden();
+		::AdjustWindowRect(&rect, lStyle, bBarHidden ? FALSE : TRUE);
+		::SetWindowPos(m_hRetWnd, HWND_TOP, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOMOVE | SWP_NOZORDER);
 	}
 
 	AdjustOffset();
@@ -149,14 +144,4 @@ void CViewManager::RequestRedraw()
 	{
 		::InvalidateRect(m_hRetWnd, nullptr, FALSE);
 	}
-}
-/*ウィンドウバー有無*/
-bool CViewManager::IsWidowBarHidden()
-{
-	if (m_hRetWnd != nullptr)
-	{
-		LONG lStyle = ::GetWindowLong(m_hRetWnd, GWL_STYLE);
-		return !((lStyle & WS_CAPTION) && (lStyle & WS_SYSMENU));
-	}
-	return false;
 }

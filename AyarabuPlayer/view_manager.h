@@ -36,8 +36,6 @@ private:
     void ResizeWindow();
     void AdjustOffset();
     void RequestRedraw();
-
-    bool IsWidowBarHidden();
 };
 
 #endif // !VIEW_MANAGER_H_
