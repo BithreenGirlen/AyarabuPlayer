@@ -1,5 +1,4 @@
 ﻿
-#include <memory>
 
 #include "ayarabu.h"
 
@@ -165,48 +164,50 @@ namespace ayarabu
 	/*音声ファイル名称書式表構築*/
 	static void SetupVoiceFileNameFormatInfo(const std::wstring& wstrFilePath)
 	{
-		std::string strFile = win_filesystem::LoadFileAsString(wstrFilePath.c_str());
+		const std::string strFile = win_filesystem::LoadFileAsString(wstrFilePath.c_str());
 		if (strFile.empty())return;
-		text_utility::ReplaceAll(strFile, "\t", "");
-		text_utility::ReplaceAll(strFile, "\n", "");
 
-		char* p = &strFile[0];
-		auto pp = std::make_unique<char*>();
-		/*Actually masterData is not JSON, but partially can be regared as JSON.*/
-		bool bRet = json_minimal::ExtractJsonArray(&p, nullptr, &*pp);
+		const char* p = &strFile[0];
+		const char* pStart = nullptr, * pEnd = nullptr;
+		/*
+		* Actually, masterData is not JSON, but partially can be regarded as JSON
+		* in that (1) it represents nest structure with '[' and ']',
+		* (2) quotes string using '"', and (3) represents array with ','.
+		* Or might be regarded as CSV having replaced new line with '[' and ']'.
+		* Anyway, trying to "parse" it will fail because it is not valid JSON as a whole.
+		* What is done here is to "extract" a part of it without checking its validity as a whole.
+		*/
+		bool bRet = json_minimal::FindNextArray(&p, nullptr, &pStart, &pEnd);
 		if (!bRet)return;
 
 		std::vector<std::string> lists;
-		p = *pp + 1;
+		p = pStart + 1;
 		for (;;)
 		{
-			pp = std::make_unique<char*>();
-			bool bRet = json_minimal::ExtractJsonArray(&p, nullptr, &*pp);
+			bRet = json_minimal::FindNextArray(&p, nullptr, &pStart, &pEnd);
 			if (!bRet)break;
 
-			lists.push_back(*pp);
+			lists.emplace_back(pStart, pEnd);
 		}
-
 		std::vector<std::vector<std::string>> formatData;
-		std::vector<char> vBuffer(512, '\0');
-		for (auto& list : lists)
+		for (const auto& list : lists)
 		{
 			std::vector<std::string> formatDatum;
 			p = &list[0];
 			for (;;)
 			{
-				bRet = json_minimal::ReadNextArrayValue(&p, vBuffer.data(), vBuffer.size());
+				bRet = json_minimal::util::ReadNextValueInArray(&p, &pStart, &pEnd);
 				if (!bRet)break;
-				formatDatum.push_back(vBuffer.data());
-			}
 
+				formatDatum.emplace_back(pStart, pEnd);
+			}
 			formatData.push_back(std::move(formatDatum));
 		}
 
 		g_formatData = std::move(formatData);
 	}
 	/*音声ファイル名称書式探索*/
-	static std::string FindVoiceFileFormat(const std::string& strKey)
+	static const std::string FindVoiceFileFormat(const std::string& strKey)
 	{
 		for (size_t i = 0; i < g_formatData.size(); ++i)
 		{
@@ -215,7 +216,7 @@ namespace ayarabu
 				return g_formatData[i][1];
 			}
 		}
-		return std::string();
+		return std::string{};
 	}
 
 	static std::wstring DeriveSoundMasterDataPathFromScriptFilePath(const std::wstring& wstrFilePath)
@@ -295,14 +296,15 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 	if (storyData.empty())return false;
 
 	std::string strFormatId = BaseIdToFormatId(llBaseId);
-	std::string strFilePathFormat = FindVoiceFileFormat(strFormatId);
+	const std::string& strFilePathFormat = FindVoiceFileFormat(strFormatId);
 	if (strFilePathFormat.empty())return false;
 
-	text_utility::ReplaceAll(strFilePathFormat, "ep{1}", "ep");
+	size_t nFormatPos = strFilePathFormat.find("{1}");
+	if (nFormatPos == std::string::npos)nFormatPos = strFilePathFormat.size();
 
 	std::vector<std::wstring> voiceFilePaths;
 	std::wstring wstrFolderPath = g_wstrVoiceFolderPath;
-	wstrFolderPath.append(L"\\").append(win_text::WidenUtf8(strFilePathFormat)).push_back('3');
+	wstrFolderPath.append(L"\\").append(win_text::WidenUtf8(&strFilePathFormat[0], static_cast<int>(nFormatPos))).push_back('3');
 	win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".m4a", voiceFilePaths);
 
 	size_t nIntroVoiceFileCount = voiceFilePaths.size();
