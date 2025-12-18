@@ -114,9 +114,6 @@ bool CD2ImageDrawer::Draw(const void* srcData, const UINT32 width, const UINT32 
 	bool bRet = CheckBitmapSize(width, height);
 	if (!bRet)return false;
 
-	bRet = CheckBufferSize();
-	if (!bRet)return false;
-
 	D2D1_RECT_U rc = { 0, 0, width, height };
 	HRESULT hr = m_pD2d1Bitmap->CopyFromMemory(&rc, srcData, stride);
 	if (FAILED(hr))return false;
@@ -141,9 +138,6 @@ bool CD2ImageDrawer::Draw(ID2D1Bitmap* pD2d1Bitmap, const D2D_VECTOR_2F fOffset,
 
 	D2D1_SIZE_U s = pD2d1Bitmap->GetPixelSize();
 	bool bRet = CheckBitmapSize(s.width, s.height);
-	if (!bRet)return false;
-
-	bRet = CheckBufferSize();
 	if (!bRet)return false;
 
 	CComPtr<ID2D1Effect> pD2d1Effect;
