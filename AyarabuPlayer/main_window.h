@@ -15,7 +15,6 @@
 #include "view_manager.h"
 #include "adv.h"
 #include "win_timer.h"
-#include "image_info.h"
 
 class CMainWindow
 {
@@ -125,7 +124,7 @@ private:
 	void ClearStoeredVideoFrame();
 	ID2D1Bitmap* RestoreVideoFrame(long long llCurrentTime);
 
-	std::unordered_map<std::wstring, ImageInfo> m_imageMap;
+	std::unordered_map<std::wstring, CComPtr<ID2D1Bitmap>> m_imageMap;
 	void CreateImageMap();
 	void ClearImageMap();
 

@@ -24,9 +24,6 @@
     <ClInclude Include="d2_text_writer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="image_info.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="main_window.h">
       <Filter>Header Files</Filter>
     </ClInclude>

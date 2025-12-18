@@ -132,7 +132,6 @@
     <ClInclude Include="ayarabu.h" />
     <ClInclude Include="d2_image_drawer.h" />
     <ClInclude Include="d2_text_writer.h" />
-    <ClInclude Include="image_info.h" />
     <ClInclude Include="json_minimal.h" />
     <ClInclude Include="main_window.h" />
     <ClInclude Include="media_setting_dialogue.h" />

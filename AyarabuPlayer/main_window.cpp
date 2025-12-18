@@ -269,8 +269,7 @@ LRESULT CMainWindow::OnPaint()
 		const auto& iter = m_imageMap.find(paintDatum.wstrFilePath);
 		if (iter != m_imageMap.cend())
 		{
-			const ImageInfo& s = iter->second;
-			bRet = m_pD2ImageDrawer->Draw(s.pixels.data(), s.uiWidth, s.uiHeight, s.iStride, { m_pViewManager->GetXOffset(), m_pViewManager->GetYOffset() }, m_pViewManager->GetScale());
+			bRet = m_pD2ImageDrawer->Draw(iter->second.p, { m_pViewManager->GetXOffset(), m_pViewManager->GetYOffset() }, m_pViewManager->GetScale());
 		}
 	}
 
@@ -785,7 +784,8 @@ void CMainWindow::UpdatePaintData()
 			const auto& iter = m_imageMap.find(paintDatum.wstrFilePath);
 			if (iter != m_imageMap.cend())
 			{
-				m_pViewManager->SetBaseSize(iter->second.uiWidth, iter->second.uiHeight);
+				const auto& size = iter->second->GetSize();
+				m_pViewManager->SetBaseSize(static_cast<unsigned int>(size.width), static_cast<unsigned int>(size.height));
 				m_pViewManager->ResetZoom();
 				m_bFirstPaintLoaded = true;
 			}
@@ -871,6 +871,8 @@ ID2D1Bitmap* CMainWindow::RestoreVideoFrame(long long llCurrentTime)
 /*静画メモリ取り込み*/
 void CMainWindow::CreateImageMap()
 {
+	if (m_pD2ImageDrawer == nullptr)return;
+	ID2D1DeviceContext* const pD2d1DeviceContext = m_pD2ImageDrawer->GetD2DeviceContext();
 	for (const auto& paintData : m_paintData)
 	{
 		if (!paintData.isVideo)
@@ -878,11 +880,16 @@ void CMainWindow::CreateImageMap()
 			const auto& iter = m_imageMap.find(paintData.wstrFilePath);
 			if (iter == m_imageMap.cend())
 			{
-				ImageInfo s{};
-				bool bRet = win_image::LoadImageToMemory(paintData.wstrFilePath.c_str(), &s, 1.f);
+				CComPtr<IWICBitmap> pWicBitmap;
+				bool bRet = win_image::LoadImageToWicBitmap(paintData.wstrFilePath.c_str(), reinterpret_cast<void**>(&pWicBitmap));
 				if (bRet)
 				{
-					m_imageMap.insert({ paintData.wstrFilePath, s });
+					CComPtr<ID2D1Bitmap> pD2d1Bitmap;
+					HRESULT hr = pD2d1DeviceContext->CreateBitmapFromWicBitmap(pWicBitmap, D2D1::BitmapProperties(D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE)), &pD2d1Bitmap);
+					if (SUCCEEDED(hr))
+					{
+						m_imageMap.insert({ paintData.wstrFilePath, std::move(pD2d1Bitmap) });
+					}
 				}
 			}
 		}
