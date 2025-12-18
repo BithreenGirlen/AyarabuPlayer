@@ -237,43 +237,34 @@ LRESULT CMainWindow::OnPaint()
 		return 0;
 	}
 
+	m_pD2ImageDrawer->Clear();
+
 	bool bRet = false;
 	const adv::PaintDatum& paintDatum = m_paintData[m_nPaintIndex];
-	if (paintDatum.bIsVideo)
+	if (paintDatum.isVideo)
 	{
-		CMfVideoTransferor::SVideoFrame sVideoFrame{};
-		bRet = m_pVideoTransferor->TransferVideoFrame(&sVideoFrame);
-		if (bRet && sVideoFrame.pPixels != nullptr)
+		CComPtr<ID2D1Bitmap> d2d1Bitmap;
+		long long frameTime = 0;
+		bRet = m_pVideoTransferor->TransferVideoFrame(m_pD2ImageDrawer->GetD2DeviceContext(), &d2d1Bitmap, &frameTime);
+		if (bRet)
 		{
-			if (m_pViewManager != nullptr)
+			bRet = m_pD2ImageDrawer->Draw(d2d1Bitmap.p, { m_pViewManager->GetXOffset(), m_pViewManager->GetYOffset() }, m_pViewManager->GetScale());
+			if (bRet)
 			{
-				ImageInfo s;
-				s.uiWidth = sVideoFrame.iWidth;
-				s.uiHeight = sVideoFrame.iHeight;
-				s.iStride = sVideoFrame.uiStride;
-				s.pixels.resize(sVideoFrame.nPixelSize);
-				memcpy(s.pixels.data(), sVideoFrame.pPixels, sVideoFrame.nPixelSize);
-
-				bRet = m_pD2ImageDrawer->Draw(s.pixels.data(), s.uiWidth, s.uiHeight, s.iStride, { static_cast<float>(m_pViewManager->GetXOffset()), static_cast<float>(m_pViewManager->GetYOffset()) }, m_pViewManager->GetScale());
-
-				if (bRet)
-				{
-					StoreVideoFrame(sVideoFrame.llCurrentTime, s);
-				}
+				StoreVideoFrame(frameTime, d2d1Bitmap);
 			}
-			free(sVideoFrame.pPixels);
 		}
 		else
 		{
 			long long llCurrentTime = m_pVideoTransferor->GetCurrentTimeInMilliSeconds();
-			const ImageInfo* s = RestoreVideoFrame(llCurrentTime);
-			if (s != nullptr)
+			ID2D1Bitmap* p = RestoreVideoFrame(llCurrentTime);
+			if (p != nullptr)
 			{
-				bRet = m_pD2ImageDrawer->Draw(s->pixels.data(), s->uiWidth, s->uiHeight, s->iStride, { m_pViewManager->GetXOffset(), m_pViewManager->GetYOffset() }, m_pViewManager->GetScale());
+				bRet = m_pD2ImageDrawer->Draw(p, { m_pViewManager->GetXOffset(), m_pViewManager->GetYOffset() }, m_pViewManager->GetScale());
 			}
 		}
 	}
-	else
+	else /* 静止画 */
 	{
 		const auto& iter = m_imageMap.find(paintDatum.wstrFilePath);
 		if (iter != m_imageMap.cend())
@@ -775,11 +766,10 @@ void CMainWindow::UpdatePaintData()
 {
 	if (m_nPaintIndex >= m_paintData.size())return;
 
+	ClearStoeredVideoFrame();
 	const adv::PaintDatum& paintDatum = m_paintData[m_nPaintIndex];
-	if (paintDatum.bIsVideo)
+	if (paintDatum.isVideo)
 	{
-		ClearStoeredVideoFrame();
-
 		if (m_pVideoTransferor != nullptr)
 		{
 			m_pVideoTransferor->Play(paintDatum.wstrFilePath.c_str());
@@ -855,12 +845,12 @@ std::wstring CMainWindow::FormatCurrentText()
 }
 
 /*転送動画溜め置き*/
-void CMainWindow::StoreVideoFrame(long long llCurrentTime, const ImageInfo& imageInfo)
+void CMainWindow::StoreVideoFrame(long long llCurrentTime, CComPtr<ID2D1Bitmap> pD2D1Bitmap)
 {
 	constexpr int kMaxBufferMilliSeconds = 200;
 	if (llCurrentTime < kMaxBufferMilliSeconds)
 	{
-		m_storedVideoFrames.insert({ llCurrentTime, imageInfo });
+		m_storedVideoFrames.insert({ llCurrentTime, std::move(pD2D1Bitmap) });
 	}
 }
 /*溜め置き動画消去*/
@@ -869,12 +859,12 @@ void CMainWindow::ClearStoeredVideoFrame()
 	m_storedVideoFrames.clear();
 }
 /*溜め置き転送動画取り出し*/
-ImageInfo* CMainWindow::RestoreVideoFrame(long long llCurrentTime)
+ID2D1Bitmap* CMainWindow::RestoreVideoFrame(long long llCurrentTime)
 {
-	const auto iter = m_storedVideoFrames.find(llCurrentTime);
+	const auto& iter = m_storedVideoFrames.find(llCurrentTime);
 	if (iter != m_storedVideoFrames.cend())
 	{
-		return &iter->second;
+		return iter->second.p;
 	}
 	return nullptr;
 }
@@ -883,7 +873,7 @@ void CMainWindow::CreateImageMap()
 {
 	for (const auto& paintData : m_paintData)
 	{
-		if (!paintData.bIsVideo)
+		if (!paintData.isVideo)
 		{
 			const auto& iter = m_imageMap.find(paintData.wstrFilePath);
 			if (iter == m_imageMap.cend())

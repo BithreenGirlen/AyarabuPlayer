@@ -13,7 +13,7 @@ namespace adv
 
 	struct PaintDatum
 	{
-		bool bIsVideo = false;
+		bool isVideo = false;
 		std::wstring wstrFilePath;
 	};
 }

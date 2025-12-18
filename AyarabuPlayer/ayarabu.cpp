@@ -7,6 +7,7 @@
 #include "text_utility.h"
 #include "json_minimal.h"
 
+/* 内部用 */
 namespace ayarabu
 {
 	struct StoryDatum
@@ -270,7 +271,27 @@ namespace ayarabu
 		long long llBaseId = wcstol(wstrId.c_str(), nullptr, 10);
 		return llBaseId;
 	}
-}
+	/* 音声ファイル探索 */
+	static size_t FindVoiceFiles(long long baseId, std::vector<std::wstring>& voiceFilePaths)
+	{
+		std::string strFormatId = BaseIdToFormatId(baseId);
+		const std::string& strFilePathFormat = FindVoiceFileFormat(strFormatId);
+		if (strFilePathFormat.empty())return false;
+
+		size_t nFormatPos = strFilePathFormat.find("{1}");
+		if (nFormatPos == std::string::npos)nFormatPos = strFilePathFormat.size();
+
+		std::wstring wstrFolderPath = g_wstrVoiceFolderPath;
+		wstrFolderPath.append(L"\\").append(win_text::WidenUtf8(&strFilePathFormat[0], static_cast<int>(nFormatPos))).push_back('3');
+		win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".m4a", voiceFilePaths);
+
+		size_t nIntroVoiceFileCount = voiceFilePaths.size();
+		wstrFolderPath.back() = L'4';
+		win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".m4a", voiceFilePaths);
+
+		return nIntroVoiceFileCount;
+	}
+} /* namespace ayarabu */
 
 bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::TextDatum>& textData, std::vector<adv::PaintDatum>& paintData)
 {
@@ -295,24 +316,11 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 	ReadScript(wstrFilePath, storyData);
 	if (storyData.empty())return false;
 
-	std::string strFormatId = BaseIdToFormatId(llBaseId);
-	const std::string& strFilePathFormat = FindVoiceFileFormat(strFormatId);
-	if (strFilePathFormat.empty())return false;
-
-	size_t nFormatPos = strFilePathFormat.find("{1}");
-	if (nFormatPos == std::string::npos)nFormatPos = strFilePathFormat.size();
-
 	std::vector<std::wstring> voiceFilePaths;
-	std::wstring wstrFolderPath = g_wstrVoiceFolderPath;
-	wstrFolderPath.append(L"\\").append(win_text::WidenUtf8(&strFilePathFormat[0], static_cast<int>(nFormatPos))).push_back('3');
-	win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".m4a", voiceFilePaths);
-
-	size_t nIntroVoiceFileCount = voiceFilePaths.size();
-	wstrFolderPath.back() = L'4';
-	win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".m4a", voiceFilePaths);
+	size_t nIntroVoiceFileCount = FindVoiceFiles(llBaseId, voiceFilePaths);
 
 	const auto FindMainCharacterName = [&storyData]()
-		-> std::wstring
+		-> const std::wstring
 		{
 			for (long long i = storyData.size() - 1; i >= 0; --i)
 			{
@@ -360,7 +368,8 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 	std::wstring wstrImageId = BaseIdToStillOrVideoId(llBaseId);
 
 	std::vector<std::wstring> stillImageFilePaths;
-	wstrFolderPath.assign(g_wstrStillFolderPath).append(L"\\advstill").append(wstrImageId);
+	std::wstring wstrFolderPath = g_wstrStillFolderPath;
+	wstrFolderPath.append(L"\\advstill").append(wstrImageId);
 	win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".png", stillImageFilePaths);
 
 	stillImageFilePaths.erase(std::remove_if(stillImageFilePaths.begin(), stillImageFilePaths.end(),
@@ -392,7 +401,7 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 			for (size_t i = 0; i < stillImageFilePaths.size() - 1; ++i)
 			{
 				adv::PaintDatum imageDatum;
-				imageDatum.bIsVideo = false;
+				imageDatum.isVideo = false;
 				imageDatum.wstrFilePath = stillImageFilePaths[i];
 				paintData.push_back(std::move(imageDatum));
 			}
@@ -400,7 +409,7 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 			for (const auto& path : videoFilePaths)
 			{
 				adv::PaintDatum imageDatum;
-				imageDatum.bIsVideo = true;
+				imageDatum.isVideo = true;
 				imageDatum.wstrFilePath = path;
 				paintData.push_back(std::move(imageDatum));
 			}
@@ -412,7 +421,7 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 			for (size_t i = 0; i < stillImageFilePaths.size() / 2; ++i)
 			{
 				adv::PaintDatum imageDatum;
-				imageDatum.bIsVideo = false;
+				imageDatum.isVideo = false;
 				imageDatum.wstrFilePath = stillImageFilePaths[i];
 				paintData.push_back(std::move(imageDatum));
 			}
@@ -420,7 +429,7 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 			for (const auto& path : videoFilePaths)
 			{
 				adv::PaintDatum imageDatum;
-				imageDatum.bIsVideo = true;
+				imageDatum.isVideo = true;
 				imageDatum.wstrFilePath = path;
 				paintData.push_back(std::move(imageDatum));
 			}
@@ -428,7 +437,7 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 			for (size_t i = stillImageFilePaths.size() / 2; i < stillImageFilePaths.size(); ++i)
 			{
 				adv::PaintDatum imageDatum;
-				imageDatum.bIsVideo = false;
+				imageDatum.isVideo = false;
 				imageDatum.wstrFilePath = stillImageFilePaths[i];
 				paintData.push_back(std::move(imageDatum));
 			}

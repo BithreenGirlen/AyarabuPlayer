@@ -2,6 +2,7 @@
 #define MAIN_WINDOW_H_
 
 #include <Windows.h>
+#include <atlbase.h>
 
 #include <string>
 #include <vector>
@@ -119,10 +120,10 @@ private:
 	void AutoTexting();
 	std::wstring FormatCurrentText();
 
-	std::unordered_map<long long, ImageInfo> m_storedVideoFrames;
-	void StoreVideoFrame(long long llCurrentTime, const ImageInfo& imageInfo);
+	std::unordered_map<long long, CComPtr<ID2D1Bitmap>> m_storedVideoFrames;
+	void StoreVideoFrame(long long llCurrentTime, CComPtr<ID2D1Bitmap> pD2D1Bitmap);
 	void ClearStoeredVideoFrame();
-	ImageInfo* RestoreVideoFrame(long long llCurrentTime);
+	ID2D1Bitmap* RestoreVideoFrame(long long llCurrentTime);
 
 	std::unordered_map<std::wstring, ImageInfo> m_imageMap;
 	void CreateImageMap();
