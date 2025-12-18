@@ -16,12 +16,7 @@ namespace ayarabu
 		std::wstring wstrText;
 	};
 
-	/*
-	* "voiceFormatId",
-	* "directoryPath",
-	* "assetBundleName",
-	* "assetDataName"
-	*/
+	/* "voiceFormatId", "directoryPath", "assetBundleName", "assetDataName" */
 	static std::vector<std::vector<std::string>> g_formatData;
 	static std::wstring g_wstrStillFolderPath;
 	static std::wstring g_wstrVideoFolderPath;
@@ -41,7 +36,7 @@ namespace ayarabu
 		return ul;
 	}
 
-	/*脚本ファイル読み取り*/
+	/* 脚本ファイル読み取り */
 	static void ReadScript(const std::wstring& wstrFilePath, std::vector<StoryDatum>& storyData)
 	{
 		std::string strFile = win_filesystem::LoadFileAsString(wstrFilePath.c_str());
@@ -50,110 +45,44 @@ namespace ayarabu
 		if (strFile.size() <= kTextOffset + 4ULL)return;
 
 		unsigned long ulPos = ToUInt32(&strFile[kTextOffset]);
-		std::wstring wstrText = win_text::WidenUtf8(&strFile[ulPos], static_cast<int>(strFile.size() - ulPos));
 
-		std::vector<size_t> counts;
-		std::vector<std::wstring> texts;
-		std::wstring wstrTemp;
-		size_t nCount = 0;
-		for (size_t nRead = 0; nRead < wstrText.size(); ++nRead)
+		/*
+		* 文章データは以下の繰り返し：
+		* 1. 発言者名; 地の文、若しくは主人公の場合'\0'
+		* 2. 終端文字'\0'
+		* 3. 次の4の倍数境界まで'\0'埋め
+		* 4. 台詞もしくは地の文
+		* 5. 終端文字'\0'
+		* 6. 次の4の倍数境界まで'\0'埋め
+		*/
+		for (size_t nRead = ulPos; nRead < strFile.size();)
 		{
-			if (wstrText[nRead] == L'\0')
+			StoryDatum s;
+
+			size_t nPos = strFile.find('\0', nRead);
+			if (nPos == std::string::npos)break;
+
+			size_t nLength = nPos - nRead;
+			if (nLength)
 			{
-				++nCount;
-				if (!wstrTemp.empty())
-				{
-					texts.push_back(wstrTemp);
-					wstrTemp.clear();
-				}
-				continue;
+				s.wstrName = win_text::WidenUtf8(&strFile[nRead], static_cast<int>(nLength));
 			}
+			size_t nPadding = nLength % 4ULL ? 4ULL - (nLength % 4ULL) : 4ULL;
 
-			wstrTemp.push_back(wstrText[nRead]);
-			if (nCount > 0)
+			nRead = nPos + nPadding;
+
+			nPos = strFile.find('\0', nRead);
+			if (nPos == std::string::npos)break;
+
+			nLength = nPos - nRead;
+			if (nLength)
 			{
-				counts.push_back(nCount);
+				s.wstrText = win_text::WidenUtf8(&strFile[nRead], static_cast<int>(nLength));
 			}
-			nCount = 0;
-		}
+			nPadding = nLength % 4ULL ? 4ULL - (nLength % 4ULL) : 4ULL;
 
-		if (nCount > 0)
-		{
-			counts.push_back(nCount);
-		}
-		if (!wstrTemp.empty())
-		{
-			texts.push_back(wstrTemp);
-		}
-
-		constexpr int iNarattiveCounts = 4;
-
-		StoryDatum storyDatumBuffer;
-		bool bNarrative = !texts.empty() && texts[0].size() > 6;
-		if (bNarrative)
-		{
-			for (size_t i = 0; i < counts.size() && i < texts.size(); ++i)
-			{
-				if (i == 0)
-				{
-					bNarrative = counts[i] >= iNarattiveCounts;
-				}
-				else
-				{
-					bNarrative = counts[i] > iNarattiveCounts;
-				}
-				if (bNarrative)
-				{
-					storyDatumBuffer.wstrText = texts[i];
-					storyData.push_back(storyDatumBuffer);
-					storyDatumBuffer = StoryDatum{};
-					continue;
-				}
-
-				if (storyDatumBuffer.wstrName.empty())
-				{
-					storyDatumBuffer.wstrName = texts[i];
-				}
-				else
-				{
-					storyDatumBuffer.wstrText = texts[i];
-					storyData.push_back(storyDatumBuffer);
-					storyDatumBuffer = StoryDatum{};
-				}
-			}
-		}
-		else
-		{
-			for (size_t i = 0; i < counts.size() && i < texts.size(); ++i)
-			{
-				if (bNarrative)
-				{
-					storyDatumBuffer.wstrText = texts[i];
-					storyData.push_back(storyDatumBuffer);
-					storyDatumBuffer = StoryDatum{};
-					if (counts[i] <= iNarattiveCounts)
-					{
-						bNarrative = false;
-					}
-					continue;
-				}
-
-				if (storyDatumBuffer.wstrName.empty())
-				{
-					storyDatumBuffer.wstrName = texts[i];
-				}
-				else
-				{
-					storyDatumBuffer.wstrText = texts[i];
-					storyData.push_back(storyDatumBuffer);
-					storyDatumBuffer = StoryDatum{};
-
-					if (counts[i] > iNarattiveCounts)
-					{
-						bNarrative = true;
-					}
-				}
-			}
+			nRead = nPos + nPadding;
+			storyData.push_back(std::move(s));
 		}
 
 		for (auto& storyDatum : storyData)
@@ -342,8 +271,9 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 		if (!storyDatum.wstrName.empty())
 		{
 			textDatum.wstrText = storyDatum.wstrName;
-			textDatum.wstrText += L": ";
+			textDatum.wstrText += L':';
 		}
+		textDatum.wstrText += L" \n";
 		textDatum.wstrText += storyDatum.wstrText;
 		if (storyDatum.wstrName == wstrMainCharacterName)
 		{
