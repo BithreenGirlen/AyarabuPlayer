@@ -17,7 +17,7 @@ namespace ayarabu
 	};
 
 	/* "voiceFormatId", "directoryPath", "assetBundleName", "assetDataName" */
-	static std::vector<std::vector<std::string>> g_formatData;
+	static std::vector<std::vector<std::string>> g_voiceFormatData;
 	static std::wstring g_wstrStillFolderPath;
 	static std::wstring g_wstrVideoFolderPath;
 	static std::wstring g_wstrVoiceFolderPath;
@@ -41,7 +41,7 @@ namespace ayarabu
 	{
 		std::string strFile = win_filesystem::LoadFileAsString(wstrFilePath.c_str());
 
-		constexpr int kTextOffset = 0x10;
+		static constexpr size_t kTextOffset = 0x10;
 		if (strFile.size() <= kTextOffset + 4ULL)return;
 
 		unsigned long ulPos = ToUInt32(&strFile[kTextOffset]);
@@ -67,8 +67,7 @@ namespace ayarabu
 			{
 				s.wstrName = win_text::WidenUtf8(&strFile[nRead], static_cast<int>(nLength));
 			}
-			size_t nPadding = nLength % 4ULL ? 4ULL - (nLength % 4ULL) : 4ULL;
-
+			size_t nPadding = 4ULL - (nLength % 4ULL);
 			nRead = nPos + nPadding;
 
 			nPos = strFile.find('\0', nRead);
@@ -79,9 +78,9 @@ namespace ayarabu
 			{
 				s.wstrText = win_text::WidenUtf8(&strFile[nRead], static_cast<int>(nLength));
 			}
-			nPadding = nLength % 4ULL ? 4ULL - (nLength % 4ULL) : 4ULL;
-
+			nPadding = 4ULL - (nLength % 4ULL);
 			nRead = nPos + nPadding;
+
 			storyData.push_back(std::move(s));
 		}
 
@@ -91,7 +90,7 @@ namespace ayarabu
 			text_utility::ReplaceAll(storyDatum.wstrText, L"$n", L"\n");
 		}
 	}
-	/*音声ファイル名称書式表構築*/
+	/* 音声ファイル名称書式表構築 */
 	static void SetupVoiceFileNameFormatInfo(const std::wstring& wstrFilePath)
 	{
 		const std::string strFile = win_filesystem::LoadFileAsString(wstrFilePath.c_str());
@@ -134,18 +133,19 @@ namespace ayarabu
 			formatData.push_back(std::move(formatDatum));
 		}
 
-		g_formatData = std::move(formatData);
+		g_voiceFormatData = std::move(formatData);
 	}
-	/*音声ファイル名称書式探索*/
+	/* 音声ファイル名称書式探索 */
 	static const std::string FindVoiceFileFormat(const std::string& strKey)
 	{
-		for (size_t i = 0; i < g_formatData.size(); ++i)
+		for (const auto& voiceFormatDatum : g_voiceFormatData)
 		{
-			if (g_formatData[i].size() > 2 && g_formatData[i][0] == strKey)
+			if (voiceFormatDatum.size() > 1 && voiceFormatDatum[0] == strKey)
 			{
-				return g_formatData[i][1];
+				return voiceFormatDatum[1];
 			}
 		}
+
 		return std::string{};
 	}
 
@@ -188,13 +188,14 @@ namespace ayarabu
 	static long long ExtractIdFromScriptFileName(const std::wstring& wstrFilePath)
 	{
 		constexpr wchar_t swzStart[] = L"eventdata";
+		constexpr size_t startLength = sizeof(swzStart) / sizeof(wchar_t) - 1;
 		constexpr wchar_t swzEnd[] = L"03.evsc";
 
 		size_t nPos1 = wstrFilePath.rfind(swzStart);
 		size_t nPos2 = wstrFilePath.rfind(swzEnd);
 		if (nPos1 == std::wstring::npos || nPos2 == std::wstring::npos)return -1;
 
-		nPos1 += sizeof(swzStart) / sizeof(wchar_t) - 1;
+		nPos1 += startLength;
 
 		std::wstring wstrId = wstrFilePath.substr(nPos1, nPos2 - nPos1);
 		long long llBaseId = wcstol(wstrId.c_str(), nullptr, 10);
@@ -225,13 +226,13 @@ namespace ayarabu
 bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::TextDatum>& textData, std::vector<adv::PaintDatum>& paintData)
 {
 	/*初期作成*/
-	if (g_formatData.empty())
+	if (g_voiceFormatData.empty())
 	{
 		std::wstring wstrVoiceMasterDataFilePath = DeriveSoundMasterDataPathFromScriptFilePath(wstrFilePath);
 		if (wstrVoiceMasterDataFilePath.empty())return false;
 
 		SetupVoiceFileNameFormatInfo(wstrVoiceMasterDataFilePath);
-		if (g_formatData.empty())return false;
+		if (g_voiceFormatData.empty())return false;
 
 		if (!DeriveResourceFolderPathsFromScriptFilePath(wstrFilePath))return false;
 	}
@@ -283,7 +284,7 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 				--nFilePathIndex;
 			}
 		}
-		textData.push_back(textDatum);
+		textData.push_back(std::move(textDatum));
 
 		if (nFilePathIndex < nIntroVoiceFileCount)
 		{
@@ -330,18 +331,12 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 		{
 			for (size_t i = 0; i < stillImageFilePaths.size() - 1; ++i)
 			{
-				adv::PaintDatum imageDatum;
-				imageDatum.isVideo = false;
-				imageDatum.wstrFilePath = stillImageFilePaths[i];
-				paintData.push_back(std::move(imageDatum));
+				paintData.emplace_back(adv::PaintDatum{ false, stillImageFilePaths[i] });
 			}
 
-			for (const auto& path : videoFilePaths)
+			for (const auto& voiceFilePath : videoFilePaths)
 			{
-				adv::PaintDatum imageDatum;
-				imageDatum.isVideo = true;
-				imageDatum.wstrFilePath = path;
-				paintData.push_back(std::move(imageDatum));
+				paintData.emplace_back(adv::PaintDatum{ true, voiceFilePath });
 			}
 
 			paintData.emplace_back(adv::PaintDatum{ false, stillImageFilePaths.back() });
@@ -350,26 +345,17 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 		{
 			for (size_t i = 0; i < stillImageFilePaths.size() / 2; ++i)
 			{
-				adv::PaintDatum imageDatum;
-				imageDatum.isVideo = false;
-				imageDatum.wstrFilePath = stillImageFilePaths[i];
-				paintData.push_back(std::move(imageDatum));
+				paintData.emplace_back(adv::PaintDatum{ false, stillImageFilePaths[i] });
 			}
 
-			for (const auto& path : videoFilePaths)
+			for (const auto& voiceFilePath : videoFilePaths)
 			{
-				adv::PaintDatum imageDatum;
-				imageDatum.isVideo = true;
-				imageDatum.wstrFilePath = path;
-				paintData.push_back(std::move(imageDatum));
+				paintData.emplace_back(adv::PaintDatum{ true, voiceFilePath });
 			}
 
 			for (size_t i = stillImageFilePaths.size() / 2; i < stillImageFilePaths.size(); ++i)
 			{
-				adv::PaintDatum imageDatum;
-				imageDatum.isVideo = false;
-				imageDatum.wstrFilePath = stillImageFilePaths[i];
-				paintData.push_back(std::move(imageDatum));
+				paintData.emplace_back(adv::PaintDatum{ false, stillImageFilePaths[i] });
 			}
 		}
 	}
