@@ -48,7 +48,7 @@ namespace ayarabu
 
 		/*
 		* 文章データは以下の繰り返し：
-		* 1. 発言者名; 地の文、若しくは主人公の場合'\0'
+		* 1. 話者名; 地の文、若しくは主人公の場合'\0'
 		* 2. 終端文字'\0'
 		* 3. 次の4の倍数境界まで'\0'埋め
 		* 4. 台詞もしくは地の文
@@ -206,7 +206,7 @@ namespace ayarabu
 	{
 		std::string strFormatId = BaseIdToFormatId(baseId);
 		const std::string& strFilePathFormat = FindVoiceFileFormat(strFormatId);
-		if (strFilePathFormat.empty())return false;
+		if (strFilePathFormat.empty())return 0;
 
 		size_t nFormatPos = strFilePathFormat.find("{1}");
 		if (nFormatPos == std::string::npos)nFormatPos = strFilePathFormat.size();
@@ -250,19 +250,29 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 	size_t nIntroVoiceFileCount = FindVoiceFiles(llBaseId, voiceFilePaths);
 
 	const auto FindMainCharacterName = [&storyData]()
-		-> const std::wstring
+		-> const std::wstring*
 		{
+			const std::wstring* pLast = nullptr;
 			for (long long i = storyData.size() - 1; i >= 0; --i)
 			{
-				if (!storyData[i].wstrName.empty() && storyData[i].wstrName.find(L"雄二") == std::wstring::npos)
+				const auto& refName = storyData[i].wstrName;
+				if (!refName.empty())
 				{
-					return storyData[i].wstrName;
+					if (pLast != nullptr && *pLast == refName)
+					{
+						break;
+					}
+					if (refName[0] != L'　') /* 全角文字{0x30, 0x00}; eventdata0014803.evsc */
+					{
+						pLast = &refName;
+					}
 				}
 			}
-			return std::wstring();
+			return pLast;
 		};
 
-	std::wstring wstrMainCharacterName = FindMainCharacterName();
+	const std::wstring* pMainCharacterName = FindMainCharacterName();
+	if (pMainCharacterName == nullptr)return false;
 
 	size_t nFilePathIndex = voiceFilePaths.size() - 1;
 	for (long long i = storyData.size() - 1; i >= 0; --i)
@@ -276,7 +286,7 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 		}
 		textDatum.wstrText += L" \n";
 		textDatum.wstrText += storyDatum.wstrText;
-		if (storyDatum.wstrName == wstrMainCharacterName)
+		if (storyDatum.wstrName == *pMainCharacterName)
 		{
 			if (nFilePathIndex < voiceFilePaths.size())
 			{
