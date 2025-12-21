@@ -21,7 +21,7 @@ public:
 
 	void OutLinedDraw(const wchar_t* wszText, unsigned long ulTextLength, const D2D1_RECT_F& rect = D2D1_RECT_F{});
 
-	void SwitchTextColour() { m_bColourReversed ^= true; }
+	void SwitchTextColour() { m_isColourReversed ^= true; }
 
 	float GetFontSize() const { return m_fFontSize; }
 	float GetStrokeThickness() const { return m_fStrokeThickness; }
@@ -30,6 +30,8 @@ public:
 	bool HasItalicStyle()const;
 
 	bool GetFontFamilyName(wchar_t* pwzFontFamilyName, unsigned long ulNameLength);
+
+	void OnScaleChanged();
 private:
 	static constexpr float kfDefaultFontSize = 24.f;
 	static constexpr float kfDefaultStrokeThickness = 3.2f;
@@ -46,10 +48,11 @@ private:
 
 	float m_fFontSize = kfDefaultFontSize;
 	float m_fStrokeThickness = kfDefaultStrokeThickness;
+	unsigned int m_uiDpi = 96;
 
-	bool m_bColourReversed = false;
+	bool m_isColourReversed = false;
 
-	float PointSizeToDip(float fPointSize)const { return (fPointSize / 72.f) * 96.f; };
+	float PointSizeToDip(float fPointSize)const;
 
 	void ReleaseTextFormat();
 	void ReleaseFontFace();

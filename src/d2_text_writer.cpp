@@ -22,6 +22,8 @@ CD2TextWriter::CD2TextWriter(ID2D1Factory1* pD2d1Factory1, ID2D1DeviceContext* p
 	}
 
 	CreateBrushes();
+
+	OnScaleChanged();
 }
 
 CD2TextWriter::~CD2TextWriter()
@@ -170,7 +172,7 @@ void CD2TextWriter::OutLinedDraw(const wchar_t* wszText, unsigned long ulTextLen
 		};
 
 	D2D1_SIZE_F fSize = m_pStoredD2d1DeviceContext->GetSize();
-	size_t nMax = static_cast<size_t>((fSize.width - (rect.left - rect.right)) / PointSizeToDip(m_fFontSize)) - 2LL;
+	size_t nMax = static_cast<size_t>((fSize.width - (rect.left - rect.right)) / PointSizeToDip(m_fFontSize)) - 1LL;
 
 	std::vector<std::vector<wchar_t>> lines;
 	TextToLines(lines, nMax);
@@ -225,6 +227,16 @@ bool CD2TextWriter::GetFontFamilyName(wchar_t* pwzFontFamilyName, unsigned long 
 		return m_pDWriteTextFormat->GetFontFamilyName(pwzFontFamilyName, ulNameLength) == S_OK;
 	}
 	return false;
+}
+
+void CD2TextWriter::OnScaleChanged()
+{
+	m_uiDpi = ::GetDpiForSystem();
+}
+
+float CD2TextWriter::PointSizeToDip(float fPointSize) const
+{
+	return (fPointSize / 72.f) * m_uiDpi;
 }
 /*文字書式情報解放*/
 void CD2TextWriter::ReleaseTextFormat()
@@ -307,8 +319,8 @@ bool CD2TextWriter::SingleLineGlyphDraw(const wchar_t* wszText, unsigned long ul
 	D2D1_POINT_2F fPos = { fRawPos.x - fGeoRect.left, fRawPos.y - fGeoRect.top };
 
 	m_pStoredD2d1DeviceContext->SetTransform(D2D1::Matrix3x2F::Translation(fPos.x, fPos.y));
-	m_pStoredD2d1DeviceContext->DrawGeometry(pD2d1PathGeometry, m_bColourReversed ? m_pD2d1SolidColorBrush :m_pD2dSolidColorBrushForOutline, PointSizeToDip(m_fStrokeThickness));
-	m_pStoredD2d1DeviceContext->FillGeometry(pD2d1PathGeometry, m_bColourReversed ? m_pD2dSolidColorBrushForOutline : m_pD2d1SolidColorBrush);
+	m_pStoredD2d1DeviceContext->DrawGeometry(pD2d1PathGeometry, m_isColourReversed ? m_pD2d1SolidColorBrush :m_pD2dSolidColorBrushForOutline, PointSizeToDip(m_fStrokeThickness));
+	m_pStoredD2d1DeviceContext->FillGeometry(pD2d1PathGeometry, m_isColourReversed ? m_pD2dSolidColorBrushForOutline : m_pD2d1SolidColorBrush);
 	m_pStoredD2d1DeviceContext->SetTransform(D2D1::Matrix3x2F::Translation(0.f, 0.f));
 
 	return true;
