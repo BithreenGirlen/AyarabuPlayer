@@ -129,12 +129,16 @@ LRESULT CMainWindow::HandleMessage(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 		return OnPaint();
 	case WM_ERASEBKGND:
 		return 1;
+	case WM_KEYDOWN:
+		return OnKeyDown(wParam, lParam);
 	case WM_KEYUP:
 		return OnKeyUp(wParam, lParam);
 	case WM_COMMAND:
 		return OnCommand(wParam, lParam);
 	case WM_TIMER:
 		return OnTimer(wParam);
+	case WM_MOUSEMOVE:
+		return OnMouseMove(wParam, lParam);
 	case WM_MOUSEWHEEL:
 		return OnMouseWheel(wParam, lParam);
 	case WM_LBUTTONDOWN:
@@ -275,7 +279,7 @@ LRESULT CMainWindow::OnPaint()
 
 	if (bRet)
 	{
-		if (!m_bTextHidden && m_pD2TextWriter != nullptr)
+		if (!m_isTextHidden && m_pD2TextWriter != nullptr)
 		{
 			const std::wstring wstr = FormatCurrentText();
 			m_pD2TextWriter->OutLinedDraw(wstr.c_str(), static_cast<unsigned long>(wstr.size()));
@@ -290,6 +294,24 @@ LRESULT CMainWindow::OnPaint()
 /*WM_SIZE*/
 LRESULT CMainWindow::OnSize()
 {
+
+	return 0;
+}
+/*WM_KEYDOWN*/
+LRESULT CMainWindow::OnKeyDown(WPARAM wParam, LPARAM lParam)
+{
+	switch (wParam)
+	{
+	case VK_RIGHT:
+		AutoTexting();
+		break;
+	case VK_LEFT:
+		ShiftText(false);
+		break;
+	default:
+
+		break;
+	}
 
 	return 0;
 }
@@ -315,7 +337,7 @@ LRESULT CMainWindow::OnKeyUp(WPARAM wParam, LPARAM lParam)
 		}
 		break;
 	case 'T':
-		m_bTextHidden ^= true;
+		m_isTextHidden ^= true;
 		UpdateScreen();
 		break;
 	}
@@ -383,13 +405,49 @@ LRESULT CMainWindow::OnTimer(WPARAM wParam)
 	}
 	return 0;
 }
+/* WM_MOUSEMOVE */
+LRESULT CMainWindow::OnMouseMove(WPARAM wParam, LPARAM lParam)
+{
+	WORD usKey = LOWORD(wParam);
+	if (usKey == MK_LBUTTON)
+	{
+		POINT pt{};
+		::GetCursorPos(&pt);
+
+		if (m_hasLeftBeenDragged)
+		{
+			if (m_pViewManager != nullptr)
+			{
+				int iX = m_lastCursorPos.x - pt.x;
+				int iY = m_lastCursorPos.y - pt.y;
+
+				m_pViewManager->SetOffset(iX, iY);
+				UpdateScreen();
+			}
+		}
+
+		m_lastCursorPos = pt;
+		m_hasLeftBeenDragged = true;
+	}
+
+	return 0;
+}
 /*WM_MOUSEWHEEL*/
 LRESULT CMainWindow::OnMouseWheel(WPARAM wParam, LPARAM lParam)
 {
-	int iScroll = -static_cast<short>(HIWORD(wParam)) / WHEEL_DELTA;
+	short usDelta = static_cast<short>(HIWORD(wParam));
+	int iScroll = -usDelta / WHEEL_DELTA;
 	WORD usKey = LOWORD(wParam);
 
-	if (usKey == 0)
+	if (usKey == MK_LBUTTON)
+	{
+
+	}
+	else if (usKey == MK_RBUTTON)
+	{
+		ShiftText(iScroll > 0);
+	}
+	else
 	{
 		if (m_pViewManager != nullptr)
 		{
@@ -397,34 +455,31 @@ LRESULT CMainWindow::OnMouseWheel(WPARAM wParam, LPARAM lParam)
 		}
 	}
 
-	if (usKey == MK_LBUTTON)
-	{
-
-	}
-
-	if (usKey == MK_RBUTTON)
-	{
-		ShiftText(iScroll > 0);
-	}
-
 	return 0;
 }
 /*WM_LBUTTONDOWN*/
 LRESULT CMainWindow::OnLButtonDown(WPARAM wParam, LPARAM lParam)
 {
-	::GetCursorPos(&m_CursorPos);
+	::GetCursorPos(&m_lastCursorPos);
 
-	/*When menu item is selected, WM_LBUTTONDOWN does not happen, but does WM_LBUTTONUP.*/
-	m_bLeftDowned = true;
+	m_wasLeftPressed = true;
 
 	return 0;
 }
 /*WM_LBUTTONUP*/
 LRESULT CMainWindow::OnLButtonUp(WPARAM wParam, LPARAM lParam)
 {
+	if (m_hasLeftBeenDragged)
+	{
+		m_hasLeftBeenDragged = false;
+		m_wasLeftPressed = false;
+
+		return 0;
+	}
+
 	WORD usKey = LOWORD(wParam);
 
-	if (usKey == MK_RBUTTON && m_bBarHidden)
+	if (usKey == MK_RBUTTON && m_isFramelessWindow)
 	{
 		::PostMessage(m_hWnd, WM_SYSCOMMAND, SC_MOVE, 0);
 		INPUT input{};
@@ -433,26 +488,20 @@ LRESULT CMainWindow::OnLButtonUp(WPARAM wParam, LPARAM lParam)
 		::SendInput(1, &input, sizeof(input));
 	}
 
-	if (usKey == 0 && m_bLeftDowned)
+	if (usKey == 0 && m_wasLeftPressed)
 	{
 		POINT pt{};
 		::GetCursorPos(&pt);
-		int iX = m_CursorPos.x - pt.x;
-		int iY = m_CursorPos.y - pt.y;
+		int iX = m_lastCursorPos.x - pt.x;
+		int iY = m_lastCursorPos.y - pt.y;
 
 		if (iX == 0 && iY == 0)
 		{
 			ShiftPaintData(true);
 		}
-		{
-			if (m_pViewManager != nullptr)
-			{
-				m_pViewManager->SetOffset(iX, iY);
-			}
-		}
 	}
 
-	m_bLeftDowned = false;
+	m_wasLeftPressed = false;
 
 	return 0;
 }
@@ -470,7 +519,7 @@ LRESULT CMainWindow::OnMButtonUp(WPARAM wParam, LPARAM lParam)
 
 	if (usKey == MK_RBUTTON)
 	{
-		SwitchWindowMode();
+		ToggleWindowFrameStyle();
 	}
 
 	return 0;
@@ -674,15 +723,15 @@ void CMainWindow::ChangeWindowTitle(const wchar_t* pzTitle)
 	::SetWindowTextW(m_hWnd, (pwzName == nullptr || *pwzName == L'\0') ? m_swzDefaultWindowName : pwzName);
 }
 /*表示形式変更*/
-void CMainWindow::SwitchWindowMode()
+void CMainWindow::ToggleWindowFrameStyle()
 {
-	if (!m_bPlayReady)return;
+	if (!IsPlayReady())return;
 
 	LONG lStyle = ::GetWindowLong(m_hWnd, GWL_STYLE);
 
-	m_bBarHidden ^= true;
+	m_isFramelessWindow ^= true;
 
-	if (m_bBarHidden)
+	if (m_isFramelessWindow)
 	{
 		RECT rect;
 		::GetWindowRect(m_hWnd, &rect);
@@ -719,9 +768,7 @@ bool CMainWindow::SetupScenario(const wchar_t* pwzFilePath)
 	UpdateText();
 	UpdatePaintData();
 
-	m_bPlayReady = bRet;
-
-	ChangeWindowTitle(m_bPlayReady ? pwzFilePath : nullptr);
+	ChangeWindowTitle(IsPlayReady() ? pwzFilePath : nullptr);
 
 	return bRet;
 }
@@ -737,17 +784,22 @@ void CMainWindow::ClearScenarioInfo()
 	ClearImageMap();
 	ClearStoeredVideoFrame();
 
-	m_bFirstPaintLoaded = false;
+	m_hasFirstPaintDataBeenLoaded = false;
 }
 /*再描画要求*/
-void CMainWindow::UpdateScreen()
+void CMainWindow::UpdateScreen() const
 {
 	::InvalidateRect(m_hWnd, nullptr, FALSE);
 }
-/*表示図画送り・戻し*/
-void CMainWindow::ShiftPaintData(bool bForward)
+
+bool CMainWindow::IsPlayReady() const
 {
-	if (bForward)
+	return !m_textData.empty() && !m_paintData.empty();
+}
+/*表示図画送り・戻し*/
+void CMainWindow::ShiftPaintData(bool forward)
+{
+	if (forward)
 	{
 		++m_nPaintIndex;
 		if (m_nPaintIndex >= m_paintData.size())m_nPaintIndex = 0;
@@ -779,7 +831,7 @@ void CMainWindow::UpdatePaintData()
 	else
 	{
 		m_videoTimer.End();
-		if (!m_bFirstPaintLoaded)
+		if (!m_hasFirstPaintDataBeenLoaded)
 		{
 			const auto& iter = m_imageMap.find(paintDatum.wstrFilePath);
 			if (iter != m_imageMap.cend())
@@ -787,16 +839,16 @@ void CMainWindow::UpdatePaintData()
 				const auto& size = iter->second->GetSize();
 				m_pViewManager->SetBaseSize(static_cast<unsigned int>(size.width), static_cast<unsigned int>(size.height));
 				m_pViewManager->ResetZoom();
-				m_bFirstPaintLoaded = true;
+				m_hasFirstPaintDataBeenLoaded = true;
 			}
 		}
 		UpdateScreen();
 	}
 }
 /*文章送り・戻し*/
-void CMainWindow::ShiftText(bool bForward)
+void CMainWindow::ShiftText(bool forward)
 {
-	if (bForward)
+	if (forward)
 	{
 		++m_nTextIndex;
 		if (m_nTextIndex >= m_textData.size())m_nTextIndex = 0;
@@ -835,10 +887,9 @@ void CMainWindow::AutoTexting()
 /*表示文作成*/
 std::wstring CMainWindow::FormatCurrentText()
 {
-	if (m_nTextIndex > m_textData.size() - 1)return std::wstring();
+	if (m_nTextIndex >= m_textData.size())return std::wstring();
 
-	const adv::TextDatum& t = m_textData[m_nTextIndex];
-	std::wstring wstr = t.wstrText;
+	std::wstring wstr = m_textData[m_nTextIndex].wstrText;
 	if (!wstr.empty() && wstr.back() != L'\n')wstr.push_back(L'\n');
 	wstr += std::to_wstring(m_nTextIndex + 1).append(L"/").append(std::to_wstring(m_textData.size()));
 	return wstr;
@@ -873,22 +924,22 @@ void CMainWindow::CreateImageMap()
 {
 	if (m_pD2ImageDrawer == nullptr)return;
 	ID2D1DeviceContext* const pD2d1DeviceContext = m_pD2ImageDrawer->GetD2DeviceContext();
-	for (const auto& paintData : m_paintData)
+	for (const auto& paintDatum : m_paintData)
 	{
-		if (!paintData.isVideo)
+		if (!paintDatum.isVideo)
 		{
-			const auto& iter = m_imageMap.find(paintData.wstrFilePath);
+			const auto& iter = m_imageMap.find(paintDatum.wstrFilePath);
 			if (iter == m_imageMap.cend())
 			{
 				CComPtr<IWICBitmap> pWicBitmap;
-				bool bRet = win_image::LoadImageToWicBitmap(paintData.wstrFilePath.c_str(), reinterpret_cast<void**>(&pWicBitmap));
+				bool bRet = win_image::LoadImageToWicBitmap(paintDatum.wstrFilePath.c_str(), reinterpret_cast<void**>(&pWicBitmap));
 				if (bRet)
 				{
 					CComPtr<ID2D1Bitmap> pD2d1Bitmap;
 					HRESULT hr = pD2d1DeviceContext->CreateBitmapFromWicBitmap(pWicBitmap, D2D1::BitmapProperties(D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE)), &pD2d1Bitmap);
 					if (SUCCEEDED(hr))
 					{
-						m_imageMap.insert({ paintData.wstrFilePath, std::move(pD2d1Bitmap) });
+						m_imageMap.insert({ paintDatum.wstrFilePath, std::move(pD2d1Bitmap) });
 					}
 				}
 			}
@@ -923,19 +974,19 @@ void CMainWindow::OnVideoPlayerEvent(unsigned long ulEvent)
 	case MF_MEDIA_ENGINE_EVENT_LOADEDMETADATA:
 		if (m_pVideoTransferor != nullptr)
 		{
-			if (!m_bFirstPaintLoaded)
+			if (!m_hasFirstPaintDataBeenLoaded)
 			{
-				unsigned long uiWidth = 0;
-				unsigned long uiHeight = 0;
-				bool bRet = m_pVideoTransferor->GetVideoSize(&uiWidth, &uiHeight);
+				unsigned long ulWidth = 0;
+				unsigned long ulHeight = 0;
+				bool bRet = m_pVideoTransferor->GetVideoSize(&ulWidth, &ulHeight);
 				if (bRet)
 				{
 					if (m_pViewManager != nullptr)
 					{
-						m_pViewManager->SetBaseSize(uiWidth, uiHeight);
+						m_pViewManager->SetBaseSize(ulWidth, ulHeight);
 						m_pViewManager->ResetZoom();
 					}
-					m_bFirstPaintLoaded = true;
+					m_hasFirstPaintDataBeenLoaded = true;
 				}
 			}
 		}

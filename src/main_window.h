@@ -39,9 +39,11 @@ private:
 	LRESULT OnClose();
 	LRESULT OnPaint();
 	LRESULT OnSize();
+	LRESULT OnKeyDown(WPARAM wParam, LPARAM lParam);
 	LRESULT OnKeyUp(WPARAM wParam, LPARAM lParam);
 	LRESULT OnCommand(WPARAM wParam, LPARAM lParam);
 	LRESULT OnTimer(WPARAM wParam);
+	LRESULT OnMouseMove(WPARAM wParam, LPARAM lParam);
 	LRESULT OnMouseWheel(WPARAM wParam, LPARAM lParam);
 	LRESULT OnLButtonDown(WPARAM wParam, LPARAM lParam);
 	LRESULT OnLButtonUp(WPARAM wParam, LPARAM lParam);
@@ -67,13 +69,14 @@ private:
 		kText = 1,
 	};
 
-	POINT m_CursorPos{};
-	bool m_bLeftDowned = false;
+	POINT m_lastCursorPos{};
+	bool m_wasLeftPressed = false;
+	bool m_hasLeftBeenDragged = false;
 
 	HMENU m_hMenuBar = nullptr;
-	bool m_bBarHidden = false;
-	bool m_bPlayReady = false;
-	bool m_bTextHidden = false;
+
+	bool m_isFramelessWindow = false;
+	bool m_isTextHidden = false;
 
 	std::vector<std::wstring> m_scriptFilePaths;
 	size_t m_nScriptFilePathIndex = 0;
@@ -91,12 +94,12 @@ private:
 	void MenuOnVideoSetting();
 
 	void ChangeWindowTitle(const wchar_t* pzTitle);
-	void SwitchWindowMode();
+	void ToggleWindowFrameStyle();
 
 	bool SetupScenario(const wchar_t* pwzFolderPath);
 	void ClearScenarioInfo();
 
-	void UpdateScreen();
+	void UpdateScreen() const;
 
 	CD2ImageDrawer* m_pD2ImageDrawer = nullptr;
 	CD2TextWriter* m_pD2TextWriter = nullptr;
@@ -110,11 +113,12 @@ private:
 	std::vector<adv::PaintDatum> m_paintData;
 	size_t m_nPaintIndex = 0;
 
-	bool m_bFirstPaintLoaded = false;
+	bool m_hasFirstPaintDataBeenLoaded = false;
+	bool IsPlayReady() const;
 
-	void ShiftPaintData(bool bForward);
+	void ShiftPaintData(bool forward);
 	void UpdatePaintData();
-	void ShiftText(bool bForward);
+	void ShiftText(bool forward);
 	void UpdateText();
 	void AutoTexting();
 	std::wstring FormatCurrentText();
