@@ -14,6 +14,7 @@ namespace ayarabu
 	{
 		std::wstring wstrName;
 		std::wstring wstrText;
+		uint32_t voiceId;
 	};
 
 	/* "voiceFormatId", "directoryPath", "assetBundleName", "assetDataName" */
@@ -41,47 +42,108 @@ namespace ayarabu
 	{
 		std::string strFile = win_filesystem::LoadFileAsString(wstrFilePath.c_str());
 
+		static constexpr size_t kCommandOffset = 0x08;
+		static constexpr size_t kCommandCount = 0x0c;
 		static constexpr size_t kTextOffset = 0x10;
-		if (strFile.size() <= kTextOffset + 4ULL)return;
+		static constexpr size_t kTextLength = 0x14;
 
-		unsigned long ulPos = ToUInt32(&strFile[kTextOffset]);
+		if (strFile.size() < kTextLength + 4ULL)return;
 
-		/*
-		* 文章データは以下の繰り返し：
-		* 1. 話者名; 地の文、若しくは主人公の場合'\0'
-		* 2. 終端文字'\0'
-		* 3. 次の4の倍数境界まで'\0'埋め
-		* 4. 台詞もしくは地の文
-		* 5. 終端文字'\0'
-		* 6. 次の4の倍数境界まで'\0'埋め
-		*/
-		for (size_t nRead = ulPos; nRead < strFile.size();)
+		uint32_t ulCommandPos = ToUInt32(&strFile[kCommandOffset]);
+		uint32_t ulCommandCount = ToUInt32(&strFile[kCommandCount]);
+		uint32_t ulTextPos = ToUInt32(&strFile[kTextOffset]);
+		uint32_t ulTextLength = ToUInt32(&strFile[kTextLength]);
+
+		size_t nTextEndPos = static_cast<size_t>(ulTextPos + ulTextLength);
+		if (strFile.size() < nTextEndPos)return;
+		size_t nCommandEndPos = ulCommandPos + (ulCommandCount * 8ULL);
+		if (strFile.size() < nCommandEndPos)return;
+
+		struct CommandArg
 		{
-			StoryDatum s;
+			uint8_t type;
+			uint32_t value;
+		};
 
-			size_t nPos = strFile.find('\0', nRead);
-			if (nPos == std::string::npos)break;
-
-			size_t nLength = nPos - nRead;
-			if (nLength)
+		struct CommandDatum
+		{
+			uint8_t type;
+			union Datum
 			{
-				s.wstrName = win_text::WidenUtf8(&strFile[nRead], static_cast<int>(nLength));
-			}
-			size_t nPadding = 4ULL - (nLength % 4ULL);
-			nRead = nPos + nPadding;
+				struct Params
+				{
+					uint16_t param1;
+					uint16_t param2;
+				};
+				Params params;
+				uint32_t value;
+			};
+			Datum datum;
+			std::vector<CommandArg> args;
+		};
+		std::vector<CommandDatum> commandData;
+		for (size_t nRead = ulCommandPos; nRead < nCommandEndPos;)
+		{
+			CommandDatum c;
+			c.type = strFile[nRead];
+			c.datum.value = ToUInt32(&strFile[nRead + 4]);
+			nRead += 8ULL;
 
-			nPos = strFile.find('\0', nRead);
-			if (nPos == std::string::npos)break;
+			if (c.type != 0)continue;
 
-			nLength = nPos - nRead;
-			if (nLength)
+			c.args.resize(c.datum.params.param2);
+			for (uint16_t i = 0; i < c.datum.params.param2; ++i)
 			{
-				s.wstrText = win_text::WidenUtf8(&strFile[nRead], static_cast<int>(nLength));
+				c.args[i].type = strFile[nRead];
+				c.args[i].value = ToUInt32(&strFile[nRead + 4]);
+				nRead += 8ULL;
 			}
-			nPadding = 4ULL - (nLength % 4ULL);
-			nRead = nPos + nPadding;
 
-			storyData.push_back(std::move(s));
+			commandData.push_back(std::move(c));
+		}
+
+		for (const auto& c : commandData)
+		{
+			if (c.args.size() > 4 && c.args[0].type == 3 && c.args[0].type == 3)
+			{
+				/*
+				* [0] 話者名開始位置,
+				* [1] 台詞もしくは地の文開始位置,
+				* [2] 23固定,
+				* [3] 0固定,
+				* [4] 音声ファイルID; 割り当て無しの場合0,
+				* [5] loop?
+				*/
+				StoryDatum s;
+
+				uint32_t nStart = ulTextPos + c.args[0].value;
+				if (nStart >= nTextEndPos)continue;
+
+				size_t nPos = strFile.find('\0', nStart);
+				if (nPos == std::string::npos)continue;
+
+				size_t nLength = nPos - nStart;
+				if (nLength)
+				{
+					s.wstrName = win_text::WidenUtf8(&strFile[nStart], static_cast<int>(nLength));
+				}
+
+				nStart = ulTextPos + c.args[1].value;
+				if (nStart >= nTextEndPos)continue;
+
+				nPos = strFile.find('\0', nStart);
+				if (nPos == std::string::npos)continue;
+
+				nLength = nPos - nStart;
+				if (nLength)
+				{
+					s.wstrText = win_text::WidenUtf8(&strFile[nStart], static_cast<int>(nLength));
+				}
+
+				s.voiceId = c.args[4].value;
+
+				storyData.push_back(std::move(s));
+			}
 		}
 
 		for (auto& storyDatum : storyData)
@@ -91,7 +153,7 @@ namespace ayarabu
 		}
 	}
 	/* 音声ファイル名称書式表構築 */
-	static void SetupVoiceFileNameFormatInfo(const std::wstring& wstrFilePath)
+	static void SetupVoiceFileNameFormatData(const std::wstring& wstrFilePath, std::vector<std::vector<std::string>>& formatTable)
 	{
 		const std::string strFile = win_filesystem::LoadFileAsString(wstrFilePath.c_str());
 		if (strFile.empty())return;
@@ -133,7 +195,7 @@ namespace ayarabu
 			formatData.push_back(std::move(formatDatum));
 		}
 
-		g_voiceFormatData = std::move(formatData);
+		formatTable = std::move(formatData);
 	}
 	/* 音声ファイル名称書式探索 */
 	static const std::string FindVoiceFileFormat(const std::string& strKey)
@@ -231,7 +293,7 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 		std::wstring wstrVoiceMasterDataFilePath = DeriveSoundMasterDataPathFromScriptFilePath(wstrFilePath);
 		if (wstrVoiceMasterDataFilePath.empty())return false;
 
-		SetupVoiceFileNameFormatInfo(wstrVoiceMasterDataFilePath);
+		SetupVoiceFileNameFormatData(wstrVoiceMasterDataFilePath, g_voiceFormatData);
 		if (g_voiceFormatData.empty())return false;
 
 		if (!DeriveResourceFolderPathsFromScriptFilePath(wstrFilePath))return false;
@@ -246,38 +308,41 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 	ReadScript(wstrFilePath, storyData);
 	if (storyData.empty())return false;
 
+	/*
+	* The table for voice ID and its format ID is associated in L"SoundVoiceMasterDatas.any",
+	* but this file is huge in size and avoided preferring less memory consumption.
+	* The format is easily guessed as follows:
+	* ep3 : llBaseId + '3' + voiceId
+	* ep4 : llBaseId + '4' + voiceId
+	*/
+
+	const auto FindMainStartPos = [&llBaseId, &storyData]()
+		-> size_t
+		{
+			/* uint32_t is 10 digits in maximum */
+			char sBuffer1[16]{};
+			char sBuffer2[16]{};
+			int iBaseLen = sprintf_s(sBuffer1, "%lld4", llBaseId);
+			for (size_t i = 0; i < storyData.size(); ++i)
+			{
+				if (storyData[i].voiceId == 0)continue;
+
+				sprintf_s(sBuffer2, "%ld", storyData[i].voiceId);
+				if (strncmp(sBuffer1, sBuffer2, iBaseLen) == 0)return i;
+			}
+
+			return 0;
+		};
+
+	size_t nMainStartIndex = FindMainStartPos();
+
 	std::vector<std::wstring> voiceFilePaths;
 	size_t nIntroVoiceFileCount = FindVoiceFiles(llBaseId, voiceFilePaths);
 
-	const auto FindMainCharacterName = [&storyData]()
-		-> const std::wstring*
-		{
-			const std::wstring* pLast = nullptr;
-			for (long long i = storyData.size() - 1; i >= 0; --i)
-			{
-				const auto& refName = storyData[i].wstrName;
-				if (!refName.empty())
-				{
-					if (pLast != nullptr && *pLast == refName)
-					{
-						break;
-					}
-					if (refName[0] != L'　') /* 全角文字{0x30, 0x00}; eventdata0014803.evsc */
-					{
-						pLast = &refName;
-					}
-				}
-			}
-			return pLast;
-		};
-
-	const std::wstring* pMainCharacterName = FindMainCharacterName();
-	if (pMainCharacterName == nullptr)return false;
-
-	size_t nFilePathIndex = voiceFilePaths.size() - 1;
-	for (long long i = storyData.size() - 1; i >= 0; --i)
+	for (size_t i = nMainStartIndex; i < storyData.size(); ++i)
 	{
-		const StoryDatum& storyDatum = storyData[i];
+		const auto& storyDatum = storyData[i];
+
 		adv::TextDatum textDatum;
 		if (!storyDatum.wstrName.empty())
 		{
@@ -286,23 +351,17 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 		}
 		textDatum.wstrText += L" \n";
 		textDatum.wstrText += storyDatum.wstrText;
-		if (storyDatum.wstrName == *pMainCharacterName)
+		if (storyDatum.voiceId != 0)
 		{
-			if (nFilePathIndex < voiceFilePaths.size())
+			size_t voiceFileIndex = nIntroVoiceFileCount - 1 + (storyDatum.voiceId % 1000);
+			if (voiceFileIndex < voiceFilePaths.size())
 			{
-				textDatum.wstrVoicePath = voiceFilePaths[nFilePathIndex];
-				--nFilePathIndex;
+				textDatum.wstrVoicePath = voiceFilePaths[voiceFileIndex];
 			}
 		}
+
 		textData.push_back(std::move(textDatum));
-
-		if (nFilePathIndex < nIntroVoiceFileCount)
-		{
-			break;
-		}
 	}
-
-	std::reverse(textData.begin(), textData.end());
 
 	/*静画・動画探索*/
 
