@@ -10,7 +10,7 @@ public:
     ~CViewManager();
 
     void SetBaseSize(unsigned int uiWidth, unsigned int uiHeight);
-    void Rescale(bool bUpscale);
+    void Rescale(bool toUpscale);
     void SetOffset(int iX, int iY);
     void ResetZoom();
     void OnStyleChanged();
@@ -26,7 +26,6 @@ private:
     unsigned int m_uiBaseWidth = Constants::kBaseWidth;
     unsigned int m_uiBaseHeight = Constants::kBaseHeight;
     float m_fDefaultScale = 1.f;
-    float m_fThresholdScale = 1.f;
 
     float m_fScale = 1.f;
     float m_fXOffset = 0;
@@ -35,7 +34,7 @@ private:
     void WorkOutDefaultScale();
     void ResizeWindow();
     void AdjustOffset();
-    void RequestRedraw();
+    void RequestRedraw() const;
 };
 
 #endif // !VIEW_MANAGER_H_

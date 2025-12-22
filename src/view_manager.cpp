@@ -21,11 +21,11 @@ void CViewManager::SetBaseSize(unsigned int uiWidth, unsigned int uiHeight)
 	WorkOutDefaultScale();
 }
 /*尺度変更*/
-void CViewManager::Rescale(bool bUpscale)
+void CViewManager::Rescale(bool toUpscale)
 {
 	constexpr float fScaleMin = 0.5f;
 	constexpr float fScalePortion = 0.05f;
-	if (bUpscale)
+	if (toUpscale)
 	{
 		m_fScale += fScalePortion;
 	}
@@ -47,7 +47,7 @@ void CViewManager::SetOffset(int iX, int iY)
 /*原寸表示*/
 void CViewManager::ResetZoom()
 {
-	m_fScale = 1.f;
+	m_fScale = m_fDefaultScale;
 	m_fXOffset = 0;
 	m_fYOffset = 0;
 
@@ -61,25 +61,27 @@ void CViewManager::OnStyleChanged()
 /*基準尺度算出*/
 void CViewManager::WorkOutDefaultScale()
 {
-	/*基準長がモニタ解像度より大きい場合には予め縮小する*/
+	/* 基準長がモニタ解像度より大きい場合には予め縮小する */
 
 	unsigned int uiMonitorWidth = static_cast<unsigned int>(::GetSystemMetrics(SM_CXSCREEN));
 	unsigned int uiMonitorHeight = static_cast<unsigned int>(::GetSystemMetrics(SM_CYSCREEN));
-
 	if (m_uiBaseWidth > uiMonitorWidth || m_uiBaseHeight > uiMonitorHeight)
 	{
 		if (uiMonitorWidth > uiMonitorHeight)
 		{
 			m_fDefaultScale = static_cast<float>(uiMonitorHeight) / m_uiBaseHeight;
-			m_fThresholdScale = static_cast<float>(uiMonitorWidth) / m_uiBaseWidth;
 		}
 		else
 		{
 			m_fDefaultScale = static_cast<float>(uiMonitorWidth) / m_uiBaseWidth;
-			m_fThresholdScale = static_cast<float>(uiMonitorHeight) / m_uiBaseHeight;
 		}
-		m_fScale = m_fDefaultScale;
 	}
+	else
+	{
+		m_fDefaultScale = ::GetDpiForWindow(m_hRetWnd) / 96.f;
+	}
+
+	m_fScale = m_fDefaultScale;
 }
 /*窓寸法調整*/
 void CViewManager::ResizeWindow()
@@ -127,7 +129,7 @@ void CViewManager::AdjustOffset()
 		int iClientWidth = rc.right - rc.left;
 		int iClientHeight = rc.bottom - rc.top;
 
-		int iXOffsetMax = iScaledWidth > iClientWidth ? static_cast<int>((iScaledWidth - iClientWidth)/ m_fScale) : 0;
+		int iXOffsetMax = iScaledWidth > iClientWidth ? static_cast<int>((iScaledWidth - iClientWidth) / m_fScale) : 0;
 		int iYOffsetMax = iScaledHeight > iClientHeight ? static_cast<int>((iScaledHeight - iClientHeight) / m_fScale) : 0;
 
 		if (m_fXOffset < 0) m_fXOffset = 0;
@@ -138,7 +140,7 @@ void CViewManager::AdjustOffset()
 	}
 }
 /*再描画要求*/
-void CViewManager::RequestRedraw()
+void CViewManager::RequestRedraw() const
 {
 	if (m_hRetWnd != nullptr)
 	{
