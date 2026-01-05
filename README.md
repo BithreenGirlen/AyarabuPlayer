@@ -7,7 +7,7 @@
 - Windows OS later than Windows 10
 - MSVC 2015-2022 (x64)
 
-## Setup
+## How to play
 
 Prepare all the necessary files, commented below, with proper directories. 
 
@@ -55,9 +55,7 @@ assetbundledatas
   └ ...
 </pre>
 
-## How to play
-
-Select a script file named like `eventdata*03.evsc` from menu `File->Open`.
+Then select a script file named like `eventdata*03.evsc` from menu `File->Open`.
 
 <pre>
 r18/adventure/eventdata
@@ -66,26 +64,29 @@ r18/adventure/eventdata
   └ ...
 </pre>
 
-The scene will be set up according to the specification of the script and format table.
-
 ## Menu function
 
 | Entry | Item | Function |
 | ---- | ---- | ---- |
-| File | Open | Show a dialogue to select the script file to open. |
-| Audio | Loop | Set/reset audio loop setting. |
-| - | Setting | Show a dialogue for voice setting. |
-| Video | Pause | Pause video. |
-| - | Setting | Show a dialogue for video setting. |
+| File | Open | Show a dialogue to select a script file to open. |
+| - | Next | Open the next script. |
+| - | Previous | Open the previous script. |
+| Setting | Audio | Show a dialogue for audio player volume/playback rate. |
+| - | Video | Show a dialogue for video player playback rate. |
+| Image | Pause | Pause video. |
+| - | Sync | Turn on/off the synchronisation of still/videos with texts. |
+
+- When the video is being paused, left click steps the video one frame.
+- When synchronisation is turned off, left click switches the still/video.
 
 ## Mouse function
 
 | Input | Action |
 | --- | --- |
 | Mouse wheel | Scale up/down |
-| Left click | Switch to the next image/video. |
 | Left drag | Move the region to be shown. This works only when scaled beyond the display resolution. |
-| Middle click | Reset scale to the default. |
+| Middle click | Reset the scale to the default. |
+| Right click | Show context menu to jump to the scene where still/video is switched. |
 | Right pressed + mouse wheel | Fast-forward/rewind text. |
 | Right pressed + middle click | Hide/show window's border. Having hidden, the window goes to the origin of the primary display. |
 | Right pressed + left click | Move borderless window. |
