@@ -10,7 +10,21 @@
 /* 内部用 */
 namespace ayarabu
 {
-	struct StoryDatum
+	enum class ECommandType
+	{
+		Unknown = -1,
+		Message,
+		Still,
+		Video
+	};
+
+	struct ScriptCommand
+	{
+		ECommandType commandType = ECommandType::Unknown;
+		size_t id;
+	};
+
+	struct MessageDatum
 	{
 		std::wstring wstrName;
 		std::wstring wstrText;
@@ -38,7 +52,11 @@ namespace ayarabu
 	}
 
 	/* 脚本ファイル読み取り */
-	static void ReadScript(const std::wstring& wstrFilePath, std::vector<StoryDatum>& storyData)
+	static void ReadScript(
+		const std::wstring& wstrFilePath,
+		const uint32_t baseId,
+		std::vector<MessageDatum>& messageData,
+		std::vector<ScriptCommand>& scriptCommands)
 	{
 		std::string strFile = win_filesystem::LoadFileAsString(wstrFilePath.c_str());
 
@@ -89,14 +107,15 @@ namespace ayarabu
 			c.datum.value = ToUInt32(&strFile[nRead + 4]);
 			nRead += 8ULL;
 
-			if (c.type != 0)continue;
-
-			c.args.resize(c.datum.params.param2);
-			for (uint16_t i = 0; i < c.datum.params.param2; ++i)
+			if (c.type == 0)
 			{
-				c.args[i].type = strFile[nRead];
-				c.args[i].value = ToUInt32(&strFile[nRead + 4]);
-				nRead += 8ULL;
+				c.args.resize(c.datum.params.param2);
+				for (uint16_t i = 0; i < c.datum.params.param2; ++i)
+				{
+					c.args[i].type = strFile[nRead];
+					c.args[i].value = ToUInt32(&strFile[nRead + 4]);
+					nRead += 8ULL;
+				}
 			}
 
 			commandData.push_back(std::move(c));
@@ -104,7 +123,19 @@ namespace ayarabu
 
 		for (const auto& c : commandData)
 		{
-			if (c.args.size() > 4 && c.args[0].type == 3 && c.args[0].type == 3)
+			const auto IsMessageCommand = [&c]()
+				{
+					return c.args.size() > 4 && c.args[0].type == 3 && c.args[1].type == 3;
+				};
+			const auto IsStillCommand = [&c, &baseId]()
+				{
+					return c.args.size() == 4 && c.args[1].value == baseId;
+				};
+			const auto IsVideoCommand = [&c, &baseId]()
+				{
+					return c.args.size() == 2 && c.args[1].value != 0 && c.args[0].value == baseId;
+				};
+			if (IsMessageCommand())
 			{
 				/*
 				* [0] 話者名開始位置,
@@ -112,9 +143,8 @@ namespace ayarabu
 				* [2] 23固定,
 				* [3] 0固定,
 				* [4] 音声ファイルID; 割り当て無しの場合0,
-				* [5] loop?
 				*/
-				StoryDatum s;
+				MessageDatum s;
 
 				uint32_t nStart = ulTextPos + c.args[0].value;
 				if (nStart >= nTextEndPos)continue;
@@ -142,11 +172,21 @@ namespace ayarabu
 
 				s.voiceId = c.args[4].value;
 
-				storyData.push_back(std::move(s));
+				messageData.push_back(std::move(s));
+
+				scriptCommands.emplace_back(ScriptCommand{ ECommandType::Message, messageData.size() - 1 });
+			}
+			else if (IsStillCommand())
+			{
+				scriptCommands.emplace_back(ScriptCommand{ ECommandType::Still, c.args[2].value });
+			}
+			else if (IsVideoCommand())
+			{
+				scriptCommands.emplace_back(ScriptCommand{ ECommandType::Video, c.args[1].value });
 			}
 		}
 
-		for (auto& storyDatum : storyData)
+		for (auto& storyDatum : messageData)
 		{
 			text_utility::ReplaceAll(storyDatum.wstrText, L"<name></name>", L"陰陽師");
 			text_utility::ReplaceAll(storyDatum.wstrText, L"$n", L"\n");
@@ -234,20 +274,20 @@ namespace ayarabu
 
 		return !g_wstrStillFolderPath.empty() && !g_wstrVideoFolderPath.empty() && !g_wstrVoiceFolderPath.empty();
 	}
-	/*基底ID=>書式ID*/
-	static std::string BaseIdToFormatId(long long llBaseId)
+	/* 基底ID=>書式ID */
+	static std::string BaseIdToFormatId(unsigned long baseId)
 	{
-		return std::to_string(llBaseId).append("10001");
+		return std::to_string(baseId).append("10001");
 	}
-	/*基底ID=>静画・動画ID*/
-	static std::wstring BaseIdToStillOrVideoId(long long llBaseId)
+	/* 基底ID=>静画・動画ID */
+	static std::wstring BaseIdToStillOrVideoId(unsigned long baseId)
 	{
 		wchar_t swzBuffer[5]{};
-		swprintf_s(swzBuffer, L"%04lld", llBaseId);
+		swprintf_s(swzBuffer, L"%04lu", baseId);
 		return swzBuffer;
 	}
-	/*脚本ファイル名から基底ID抽出*/
-	static long long ExtractIdFromScriptFileName(const std::wstring& wstrFilePath)
+	/* 脚本ファイル名から基底ID抽出 */
+	static unsigned long ExtractIdFromScriptFileName(const std::wstring& wstrFilePath)
 	{
 		constexpr wchar_t swzStart[] = L"eventdata";
 		constexpr size_t startLength = sizeof(swzStart) / sizeof(wchar_t) - 1;
@@ -260,11 +300,11 @@ namespace ayarabu
 		nPos1 += startLength;
 
 		std::wstring wstrId = wstrFilePath.substr(nPos1, nPos2 - nPos1);
-		long long llBaseId = wcstol(wstrId.c_str(), nullptr, 10);
-		return llBaseId;
+		unsigned long baseId = wcstoul(wstrId.c_str(), nullptr, 10);
+		return baseId;
 	}
 	/* 音声ファイル探索 */
-	static size_t FindVoiceFiles(long long baseId, std::vector<std::wstring>& voiceFilePaths)
+	static size_t FindVoiceFiles(unsigned long baseId, std::vector<std::wstring>& voiceFilePaths)
 	{
 		std::string strFormatId = BaseIdToFormatId(baseId);
 		const std::string& strFilePathFormat = FindVoiceFileFormat(strFormatId);
@@ -287,7 +327,7 @@ namespace ayarabu
 
 bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::TextDatum>& textData, std::vector<adv::PaintDatum>& paintData)
 {
-	/*初期作成*/
+	/* 初期作成 */
 	if (g_voiceFormatData.empty())
 	{
 		std::wstring wstrVoiceMasterDataFilePath = DeriveSoundMasterDataPathFromScriptFilePath(wstrFilePath);
@@ -299,133 +339,106 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 		if (!DeriveResourceFolderPathsFromScriptFilePath(wstrFilePath))return false;
 	}
 
-	long long llBaseId = ExtractIdFromScriptFileName(wstrFilePath);
-	if (llBaseId <= 0)return false;
+	uint32_t baseId = ExtractIdFromScriptFileName(wstrFilePath);
+	if (baseId == static_cast<uint32_t>(-1L)) return false;
 
-	/*文章・音声対応作成*/
+	/* 文章・音声・静画・動画に関する指令文の抜粋 */
 
-	std::vector<StoryDatum> storyData;
-	ReadScript(wstrFilePath, storyData);
-	if (storyData.empty())return false;
+	std::vector<MessageDatum> messageData;
+	std::vector<ScriptCommand> scriptCommands;
+	ReadScript(wstrFilePath, baseId, messageData, scriptCommands);
+	if (scriptCommands.empty())return false;
 
-	/*
-	* The table for voice ID and its format ID is associated in L"SoundVoiceMasterDatas.any",
-	* but this file is huge in size and avoided preferring less memory consumption.
-	* The format is easily guessed as follows:
-	* ep3 : llBaseId + '3' + voiceId
-	* ep4 : llBaseId + '4' + voiceId
-	*/
-
-	const auto FindMainStartPos = [&llBaseId, &storyData]()
-		-> size_t
+	const auto FindEpisode4StartIndex = [&scriptCommands]()
+		-> long long
 		{
-			/* uint32_t is 10 digits in maximum */
-			char sBuffer1[16]{};
-			char sBuffer2[16]{};
-			int iBaseLen = sprintf_s(sBuffer1, "%lld4", llBaseId);
-			for (size_t i = 0; i < storyData.size(); ++i)
-			{
-				if (storyData[i].voiceId == 0)continue;
+			const auto& iter = std::find_if(scriptCommands.cbegin(), scriptCommands.cend(),
+				[](const ScriptCommand& scriptCommand)
+				{
+					return scriptCommand.commandType == ECommandType::Still;
+				});
 
-				sprintf_s(sBuffer2, "%ld", storyData[i].voiceId);
-				if (strncmp(sBuffer1, sBuffer2, iBaseLen) == 0)return i;
+			if (iter != scriptCommands.cend())
+			{
+				return std::distance(scriptCommands.cbegin(), iter);
 			}
 
-			return 0;
+			return -1;
 		};
 
-	size_t nMainStartIndex = FindMainStartPos();
+	long long nEpisode4StartIndex = FindEpisode4StartIndex();
+	if (nEpisode4StartIndex == -1)return false;
+
+	/* 音声ファイル探索 */
 
 	std::vector<std::wstring> voiceFilePaths;
-	size_t nIntroVoiceFileCount = FindVoiceFiles(llBaseId, voiceFilePaths);
+	size_t nIntroVoiceFileCount = FindVoiceFiles(baseId, voiceFilePaths);
 
-	for (size_t i = nMainStartIndex; i < storyData.size(); ++i)
-	{
-		const auto& storyDatum = storyData[i];
+	/* 静画・動画ファイル探索 */
 
-		adv::TextDatum textDatum;
-		if (!storyDatum.wstrName.empty())
-		{
-			textDatum.wstrText = storyDatum.wstrName;
-			textDatum.wstrText += L':';
-		}
-		textDatum.wstrText += L" \n";
-		textDatum.wstrText += storyDatum.wstrText;
-		if (storyDatum.voiceId != 0)
-		{
-			size_t voiceFileIndex = nIntroVoiceFileCount - 1 + (storyDatum.voiceId % 1000);
-			if (voiceFileIndex < voiceFilePaths.size())
-			{
-				textDatum.wstrVoicePath = voiceFilePaths[voiceFileIndex];
-			}
-		}
+	std::wstring wstrImageId = BaseIdToStillOrVideoId(baseId);
 
-		textData.push_back(std::move(textDatum));
-	}
-
-	/*静画・動画探索*/
-
-	std::wstring wstrImageId = BaseIdToStillOrVideoId(llBaseId);
-
-	std::vector<std::wstring> stillImageFilePaths;
+	std::vector<std::wstring> stillIFilePaths;
 	std::wstring wstrFolderPath = g_wstrStillFolderPath;
 	wstrFolderPath.append(L"\\advstill").append(wstrImageId);
-	win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".png", stillImageFilePaths);
-
-	stillImageFilePaths.erase(std::remove_if(stillImageFilePaths.begin(), stillImageFilePaths.end(),
-		[](const std::wstring& wstr)
-		-> bool
-		{
-			return wstr.find(L'#') != std::wstring::npos;
-		}), stillImageFilePaths.end());
+	win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".png", stillIFilePaths);
 
 	std::vector<std::wstring> videoFilePaths;
 	wstrFolderPath.assign(g_wstrVideoFolderPath).append(L"\\chara").append(wstrImageId);
 	win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".mp4", videoFilePaths);
 
-	/*
-	* 総数 | 配分
-	* 旧版 215以前
-	*   2  | 1: 1
-	*   3  | 2: 1
-	*   4  | 3: 1
-	* 新版 216以降
-	*   2  | 1: 1
-	*   3  | 1: 2
-	*   4  | 2: 2
-	*/
-	if (stillImageFilePaths.size() > 1)
+	for (size_t i = nEpisode4StartIndex; i < scriptCommands.size(); ++i)
 	{
-		if (llBaseId < 216)
+		const auto& c = scriptCommands[i];
+		const size_t fileIndex = c.id - 1;
+		switch (c.commandType)
 		{
-			for (size_t i = 0; i < stillImageFilePaths.size() - 1; ++i)
+		case ECommandType::Message:
+			if (c.id < messageData.size())
 			{
-				paintData.emplace_back(adv::PaintDatum{ false, stillImageFilePaths[i] });
-			}
+				const auto& messageDatum = messageData[c.id];
 
-			for (const auto& voiceFilePath : videoFilePaths)
-			{
-				paintData.emplace_back(adv::PaintDatum{ true, voiceFilePath });
-			}
+				adv::TextDatum textDatum;
+				if (!messageDatum.wstrName.empty())
+				{
+					textDatum.wstrText = messageDatum.wstrName;
+					textDatum.wstrText += L':';
+				}
+				textDatum.wstrText += L" \n";
+				textDatum.wstrText += messageDatum.wstrText;
+				if (messageDatum.voiceId != 0)
+				{
+					/*
+					* Voice ID and format ID is associated in L"SoundVoiceMasterDatas.any",
+					* but this file is huge in size and avoided preferring less memory consumption.
+					* The format is easily guessed as follows:
+					* ep3 : baseId + '3' + voiceId
+					* ep4 : baseId + '4' + voiceId
+					*/
+					size_t voiceFileIndex = nIntroVoiceFileCount - 1 + (messageDatum.voiceId % 1000);
+					if (voiceFileIndex < voiceFilePaths.size())
+					{
+						textDatum.wstrVoicePath = voiceFilePaths[voiceFileIndex];
+					}
+				}
 
-			paintData.emplace_back(adv::PaintDatum{ false, stillImageFilePaths.back() });
-		}
-		else
-		{
-			for (size_t i = 0; i < stillImageFilePaths.size() / 2; ++i)
-			{
-				paintData.emplace_back(adv::PaintDatum{ false, stillImageFilePaths[i] });
+				textData.push_back(std::move(textDatum));
 			}
-
-			for (const auto& voiceFilePath : videoFilePaths)
+			break;
+		case ECommandType::Still:
+			if (fileIndex < stillIFilePaths.size())
 			{
-				paintData.emplace_back(adv::PaintDatum{ true, voiceFilePath });
+				paintData.emplace_back(adv::PaintDatum{ false, stillIFilePaths[fileIndex] });
 			}
-
-			for (size_t i = stillImageFilePaths.size() / 2; i < stillImageFilePaths.size(); ++i)
+			break;
+		case ECommandType::Video:
+			if (fileIndex < videoFilePaths.size())
 			{
-				paintData.emplace_back(adv::PaintDatum{ false, stillImageFilePaths[i] });
+				paintData.emplace_back(adv::PaintDatum{ true, videoFilePaths[fileIndex] });
 			}
+			break;
+		default:
+			break;
 		}
 	}
 
