@@ -47,36 +47,29 @@ private:
 	LRESULT OnMouseWheel(WPARAM wParam, LPARAM lParam);
 	LRESULT OnLButtonDown(WPARAM wParam, LPARAM lParam);
 	LRESULT OnLButtonUp(WPARAM wParam, LPARAM lParam);
+	LRESULT OnRButtonUp(WPARAM wParam, LPARAM lParam);
 	LRESULT OnMButtonUp(WPARAM wParam, LPARAM lParam);
 
-	enum Menu
+	struct Menu
 	{
-		kOpenFile = 1, kNextFile, kForeFile,
-		kAudioLoop, kAudioSetting,
-		kVideoPause, kVideoSetting
+		enum
+		{
+			kOpenFile = 1, kNextFile, kForeFile,
+			kAudioSetting, kVideoSetting,
+			kPauseVideo, kTickVideo, kSyncImage
+		};
 	};
-	enum MenuBar
-	{
-		kFolder, kAudio, kVideo
-	};
-	enum EventMessage
-	{
-		kAudioPlayer = WM_USER + 1,
-		kVideoPlayer
-	};
-	enum Timer
-	{
-		kText = 1,
-	};
+	struct MenuBar { enum { kFile, kSetting, kImage }; };
+	struct EventMessage { enum { kAudioPlayer = WM_USER + 1, kVideoPlayer }; };
+	struct Timer { enum { kText = 1}; };
 
 	POINT m_lastCursorPos{};
 	bool m_wasLeftPressed = false;
 	bool m_hasLeftBeenDragged = false;
+	bool m_wasRightCombinated = false;
 
 	HMENU m_hMenuBar = nullptr;
-
 	bool m_isFramelessWindow = false;
-	bool m_isTextHidden = false;
 
 	std::vector<std::wstring> m_scriptFilePaths;
 	size_t m_nScriptFilePathIndex = 0;
@@ -87,17 +80,18 @@ private:
 	void MenuOnNextFile();
 	void MenuOnForeFile();
 
-	void MenuOnAudioLoop();
 	void MenuOnAudioSetting();
-
-	void MenuOnVideoPause();
 	void MenuOnVideoSetting();
+
+	void MenuOnPauseVideo();
+	void MenuOnSyncImage();
 
 	void ChangeWindowTitle(const wchar_t* pzTitle);
 	void ToggleWindowFrameStyle();
+	void UpdateMenuItemState() const;
 
-	bool SetupScenario(const wchar_t* pwzFolderPath);
-	void ClearScenarioInfo();
+	bool SetupScenario(const wchar_t* scriptFilePath);
+	void ClearScenarioData();
 
 	void UpdateScreen() const;
 
@@ -108,19 +102,32 @@ private:
 	CViewManager* m_pViewManager = nullptr;
 
 	std::vector<adv::TextDatum> m_textData;
-	size_t m_nTextIndex = 0;
 
 	std::vector<adv::PaintDatum> m_paintData;
 	size_t m_nPaintIndex = 0;
+	size_t m_nLastVideoIndex = 0;
+
+	std::vector<adv::SceneDatum> m_sceneData;
+	size_t m_nSceneIndex = 0;
+
+	std::vector<adv::LabelDatum> m_labelData;
 
 	bool m_hasFirstPaintDataBeenLoaded = false;
+	bool m_isTextHidden = false;
+	bool m_isImageSynced = true;
+
 	bool IsPlayReady() const;
 
-	void ShiftPaintData(bool forward);
+	void ShiftPaintData();
 	void UpdatePaintData();
-	void ShiftText(bool forward);
+
+	void ShiftScene(bool forward);
+	void UpdateScene();
+
 	void UpdateText();
 	void AutoTexting();
+
+	const adv::PaintDatum* GetCurrentPaintData();
 	std::wstring FormatCurrentText();
 
 	std::unordered_map<long long, CComPtr<ID2D1Bitmap>> m_storedVideoFrames;
@@ -132,8 +139,8 @@ private:
 	void CreateImageMap();
 	void ClearImageMap();
 
-	void OnAudioPlayerEvent(unsigned long ulEvent);
-	void OnVideoPlayerEvent(unsigned long ulEvent);
+	void OnAudioPlayerEvent(unsigned long ulEvent, DWORD_PTR param1);
+	void OnVideoPlayerEvent(unsigned long ulEvent, DWORD_PTR param1);
 
 	CWinTimer m_videoTimer;
 };

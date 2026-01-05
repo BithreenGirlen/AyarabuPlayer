@@ -13,6 +13,12 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\native-ui">
+      <UniqueIdentifier>{0e6df31b-401e-4bad-9708-865af60aa1b3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\native-ui">
+      <UniqueIdentifier>{31b20498-9759-4f5c-89a5-e7f996dde8ac}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\adv.h">
@@ -25,9 +31,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\src\main_window.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\media_setting_dialogue.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\src\mf_media_player.h">
@@ -66,6 +69,12 @@
     <ClInclude Include="pch.h">
       <Filter>Resource Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\native-ui\window_menu.h">
+      <Filter>Header Files\native-ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\native-ui\media_setting_dialogue.h">
+      <Filter>Header Files\native-ui</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\d2_image_drawer.cpp">
@@ -78,9 +87,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\main_window.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\media_setting_dialogue.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\mf_media_player.cpp">
@@ -115,6 +121,12 @@
     </ClCompile>
     <ClCompile Include="pch.cpp">
       <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\native-ui\window_menu.cpp">
+      <Filter>Source Files\native-ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\native-ui\media_setting_dialogue.cpp">
+      <Filter>Source Files\native-ui</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

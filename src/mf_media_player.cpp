@@ -27,7 +27,7 @@ void CMfMediaPlayerNotify::OnMediaEngineEvent(DWORD Event, DWORD_PTR param1, DWO
 		const UINT uMsg = pPlayer->GetRetMsg();
 		if (hWnd != nullptr && uMsg != 0)
 		{
-			::PostMessage(hWnd, uMsg, 0, Event);
+			::PostMessage(hWnd, uMsg, param1, Event);
 		}
 	}
 }

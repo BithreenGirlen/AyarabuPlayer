@@ -323,9 +323,21 @@ namespace ayarabu
 
 		return nIntroVoiceFileCount;
 	}
+
+	static void ExtractFileNameWithoutExtension(const std::wstring& filePath, std::wstring& fileName)
+	{
+		size_t nPos1 = filePath.find_last_of(L"\\/");
+		if (nPos1 == std::wstring::npos)nPos1 = 0;
+		else ++nPos1;
+
+		size_t nPos2 = filePath.find(L'.', nPos1);
+		if (nPos2 == std::wstring::npos)nPos2 = filePath.size();
+
+		fileName.assign(&filePath[nPos1], &filePath[nPos2]);
+	}
 } /* namespace ayarabu */
 
-bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::TextDatum>& textData, std::vector<adv::PaintDatum>& paintData)
+bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::TextDatum>& textData, std::vector<adv::PaintDatum>& paintData, std::vector<adv::SceneDatum>& sceneData, std::vector<adv::LabelDatum>& labelData)
 {
 	/* 初期作成 */
 	if (g_voiceFormatData.empty())
@@ -387,6 +399,9 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 	wstrFolderPath.assign(g_wstrVideoFolderPath).append(L"\\chara").append(wstrImageId);
 	win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".mp4", videoFilePaths);
 
+	std::wstring labelCaptionBuffer;
+	size_t nLastPaintIndex = 0;
+	
 	for (size_t i = nEpisode4StartIndex; i < scriptCommands.size(); ++i)
 	{
 		const auto& c = scriptCommands[i];
@@ -423,18 +438,41 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 				}
 
 				textData.push_back(std::move(textDatum));
+				sceneData.push_back(adv::SceneDatum{ textData.size() - 1, nLastPaintIndex });
+				
+				if (!labelCaptionBuffer.empty())
+				{
+					labelData.emplace_back(adv::LabelDatum{ std::move(labelCaptionBuffer), sceneData.size() - 1 });
+				}
 			}
 			break;
 		case ECommandType::Still:
 			if (fileIndex < stillIFilePaths.size())
 			{
+				/* 古い寸劇では最終動画と最終静画の間に文章が存在しない。  */
+				if (!labelCaptionBuffer.empty())
+				{
+					sceneData.back().nPaintIndex = nLastPaintIndex;
+
+					if (!labelCaptionBuffer.empty())
+					{
+						labelData.emplace_back(adv::LabelDatum{ std::move(labelCaptionBuffer), sceneData.size() - 1 });
+					}
+				}
+
 				paintData.emplace_back(adv::PaintDatum{ false, stillIFilePaths[fileIndex] });
+				nLastPaintIndex = paintData.size() - 1;
+
+				ExtractFileNameWithoutExtension(stillIFilePaths[fileIndex], labelCaptionBuffer);
 			}
 			break;
 		case ECommandType::Video:
 			if (fileIndex < videoFilePaths.size())
 			{
 				paintData.emplace_back(adv::PaintDatum{ true, videoFilePaths[fileIndex] });
+				nLastPaintIndex = paintData.size() - 1;
+
+				ExtractFileNameWithoutExtension(videoFilePaths[fileIndex], labelCaptionBuffer);
 			}
 			break;
 		default:

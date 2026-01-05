@@ -5,14 +5,12 @@
 #include <Windows.h>
 #include <CommCtrl.h>
 
-#include <string>
-
 #include "media_setting_dialogue.h"
-#include "mf_media_player.h"
+#include "../mf_media_player.h"
 
 CMediaSettingDialogue::CMediaSettingDialogue()
 {
-    m_hFont = ::CreateFont(Constants::kFontSize, 0, 0, 0, FW_REGULAR, FALSE, FALSE, FALSE, EASTEUROPE_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"DFKai-SB");
+    m_hFont = ::CreateFontW(Constants::kFontSize, 0, 0, 0, FW_REGULAR, FALSE, FALSE, FALSE, EASTEUROPE_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"DFKai-SB");
 }
 
 CMediaSettingDialogue::~CMediaSettingDialogue()
@@ -59,16 +57,6 @@ bool CMediaSettingDialogue::Open(HINSTANCE hInstance, HWND hWnd, void* pMediaPla
             MessageLoop();
             return true;
         }
-        else
-        {
-            std::wstring wstrMessage = L"CreateWindowExW failed; code: " + std::to_wstring(::GetLastError());
-            ::MessageBoxW(nullptr, wstrMessage.c_str(), L"Error", MB_ICONERROR);
-        }
-    }
-    else
-    {
-        std::wstring wstrMessage = L"RegisterClassW failed; code: " + std::to_wstring(::GetLastError());
-        ::MessageBoxW(nullptr, wstrMessage.c_str(), L"Error", MB_ICONERROR);
     }
 
 	return false;
@@ -94,8 +82,6 @@ int CMediaSettingDialogue::MessageLoop()
         else
         {
             /*ループ異常*/
-            std::wstring wstrMessage = L"GetMessageW failed; code: " + std::to_wstring(::GetLastError());
-            ::MessageBoxW(nullptr, wstrMessage.c_str(), L"Error", MB_ICONERROR);
             return -1;
         }
     }
@@ -150,8 +136,8 @@ LRESULT CMediaSettingDialogue::OnCreate(HWND hWnd)
     m_hWnd = hWnd;
 
     CreateSliders();
-    m_hVolumeText = ::CreateWindowExW(0, WC_STATIC, L"Volume", WS_VISIBLE | WS_CHILD | WS_TABSTOP, 0, 0, 0, 0, m_hWnd, nullptr, m_hInstance, nullptr);
-    m_hRateText = ::CreateWindowExW(0, WC_STATIC, L"Rate", WS_VISIBLE | WS_CHILD | WS_TABSTOP, 0, 0, 0, 0, m_hWnd, nullptr, m_hInstance, nullptr);
+    m_hVolumeText = ::CreateWindowExW(0, WC_STATICW, L"Volume", WS_VISIBLE | WS_CHILD | WS_TABSTOP, 0, 0, 0, 0, m_hWnd, nullptr, m_hInstance, nullptr);
+    m_hRateText = ::CreateWindowExW(0, WC_STATICW, L"Rate", WS_VISIBLE | WS_CHILD | WS_TABSTOP, 0, 0, 0, 0, m_hWnd, nullptr, m_hInstance, nullptr);
 
     ::ShowWindow(hWnd, SW_NORMAL);
 
@@ -192,16 +178,20 @@ LRESULT CMediaSettingDialogue::OnPaint()
 /*WM_SIZE*/
 LRESULT CMediaSettingDialogue::OnSize()
 {
-    long w, h;
-    GetClientAreaSize(&w, &h);
-    long x_space = w / 100 * 10;
-    long y_space = h / 100;
+    RECT rect;
+    ::GetClientRect(m_hWnd, &rect);
+
+    long clientWidth = rect.right - rect.left;
+    long clientHeight = rect.bottom - rect.top;
+
+    long x_space = clientWidth / 100 * 10;
+    long y_space = clientHeight / 100;
 
     long lTextSpace = Constants::kFontSize;
 
     if (m_hVolumeSlider != nullptr)
     {
-        ::MoveWindow(m_hVolumeSlider, x_space, y_space + lTextSpace, w / 2 - x_space * 2, h - y_space * 2 - lTextSpace, TRUE);
+        ::MoveWindow(m_hVolumeSlider, x_space, y_space + lTextSpace, clientWidth / 2 - x_space * 2, clientHeight - y_space * 2 - lTextSpace, TRUE);
     }
 
     if (m_hVolumeText != nullptr)
@@ -212,12 +202,12 @@ LRESULT CMediaSettingDialogue::OnSize()
 
     if (m_hRateSlider != nullptr)
     {
-        ::MoveWindow(m_hRateSlider, w / 2 + x_space, y_space + lTextSpace, w / 2 - x_space * 2, h - y_space * 2 - lTextSpace, TRUE);
+        ::MoveWindow(m_hRateSlider, clientWidth / 2 + x_space, y_space + lTextSpace, clientWidth / 2 - x_space * 2, clientHeight - y_space * 2 - lTextSpace, TRUE);
     }
 
     if (m_hRateText != nullptr)
     {
-        ::MoveWindow(m_hRateText, w / 2 + x_space, y_space, Constants::kTextWidth, Constants::kFontSize, TRUE);
+        ::MoveWindow(m_hRateText, clientWidth / 2 + x_space, y_space, Constants::kTextWidth, Constants::kFontSize, TRUE);
     }
 
     return 0;
@@ -270,7 +260,7 @@ LRESULT CMediaSettingDialogue::OnCommand(WPARAM wParam, LPARAM lParam)
 /*音量調整・再生速度変更スライダ作成*/
 void CMediaSettingDialogue::CreateSliders()
 {
-    m_hVolumeSlider = ::CreateWindowExW(0, TRACKBAR_CLASS, L"Volume Slider",
+    m_hVolumeSlider = ::CreateWindowExW(0, TRACKBAR_CLASSW, L"Volume Slider",
         WS_VISIBLE | WS_CHILD | WS_TABSTOP | TBS_VERT | TBS_TOOLTIPS | TBS_BOTH,
         0, 0, 0, 0,
         m_hWnd, reinterpret_cast<HMENU>(Controls::kVolumeSlider), m_hInstance, nullptr);
@@ -281,7 +271,7 @@ void CMediaSettingDialogue::CreateSliders()
         ::SendMessage(m_hVolumeSlider, TBM_SETPAGESIZE, TRUE, 20);
     }
 
-    m_hRateSlider = ::CreateWindowExW(0, TRACKBAR_CLASS, L"Rate Slider",
+    m_hRateSlider = ::CreateWindowExW(0, TRACKBAR_CLASSW, L"Rate Slider",
         WS_VISIBLE | WS_CHILD | WS_TABSTOP | TBS_VERT | TBS_TOOLTIPS | TBS_BOTH,
         0, 0, 0, 0,
         m_hWnd, reinterpret_cast<HMENU>(Controls::kRateSkuder), m_hInstance, nullptr);
@@ -313,14 +303,6 @@ void CMediaSettingDialogue::SetSliderPosition()
             ::SendMessage(m_hRateSlider, TBM_SETPOS, TRUE, static_cast<LPARAM>(dbRate));
         }
     }
-}
-/*描画領域の大きさ取得*/
-void CMediaSettingDialogue::GetClientAreaSize(long* width, long* height)
-{
-    RECT rect;
-    ::GetClientRect(m_hWnd, &rect);
-    *width = rect.right - rect.left;
-    *height = rect.bottom - rect.top;
 }
 /*EnumChildWindows CALLBACK*/
 BOOL CMediaSettingDialogue::SetFontCallback(HWND hWnd, LPARAM lParam)

@@ -8,6 +8,12 @@
 
 namespace ayarabu
 {
-	bool LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::TextDatum>& textData, std::vector<adv::PaintDatum>& paintData);
+	bool LoadScenario(
+		const std::wstring& wstrFilePath,
+		std::vector<adv::TextDatum>& textData,
+		std::vector<adv::PaintDatum>& paintData,
+		std::vector<adv::SceneDatum>& sceneData,
+		std::vector<adv::LabelDatum>& labelData
+	);
 }
 #endif // !AYARABU_H_

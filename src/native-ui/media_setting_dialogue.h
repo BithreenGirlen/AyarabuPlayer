@@ -40,7 +40,6 @@ private:
 
 	void CreateSliders();
 	void SetSliderPosition();
-	void GetClientAreaSize(long* width, long* height);
 	static BOOL CALLBACK SetFontCallback(HWND hWnd, LPARAM lParam);
 };
 
