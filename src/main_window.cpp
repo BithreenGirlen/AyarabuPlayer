@@ -596,13 +596,13 @@ void CMainWindow::InitialiseMenuBar()
 					{},
 					{Menu::kNextFile, L"Next"},
 					{Menu::kForeFile, L"Previous"}
-				}).Get()
+				}).get()
 			},
 			{0, L"Setting", window_menu::MenuBuilder(
 				{
 					{Menu::kAudioSetting, L"Audio"},
 					{Menu::kVideoSetting, L"Video"}
-				}).Get()
+				}).get()
 			},
 			{0, L"Image", window_menu::MenuBuilder(
 				{
@@ -610,10 +610,10 @@ void CMainWindow::InitialiseMenuBar()
 						{Menu::kPauseVideo, L"Pause"},
 						{Menu::kSyncImage, L"Sync"}
 					}
-				}).Get()
+				}).get()
 			}
 		}
-	).Get();
+	).get();
 
 	if (::IsMenu(hMenu))
 	{
