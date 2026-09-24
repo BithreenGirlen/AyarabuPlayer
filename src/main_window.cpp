@@ -154,7 +154,17 @@ LRESULT CMainWindow::OnCreate(HWND hWnd)
 	UpdateMenuItemState();
 	window_menu::SetMenuCheckState(window_menu::GetMenuInBar(m_hWnd, MenuBar::kImage), Menu::kSyncImage, m_isImageSynced);
 
-	m_videoTimer.SetCallback(std::bind(&CMainWindow::UpdateScreen, this));
+	static const auto TimerCallback = [](void* pUserData)
+		-> void
+		{
+			CMainWindow* pThis = static_cast<CMainWindow*>(pUserData);
+			if (pThis != nullptr)
+			{
+				pThis->UpdateScreen();
+			}
+		};
+
+	m_videoTimer.setCallback(TimerCallback, this);
 
 	m_pD2ImageDrawer = new CD2ImageDrawer(m_hWnd);
 
@@ -182,7 +192,7 @@ LRESULT CMainWindow::OnDestroy()
 /*WM_CLOSE*/
 LRESULT CMainWindow::OnClose()
 {
-	m_videoTimer.End();
+	m_videoTimer.end();
 
 	::KillTimer(m_hWnd, Timer::kText);
 
@@ -784,7 +794,7 @@ void CMainWindow::ClearScenarioData()
 
 	ClearImageMap();
 
-	m_videoTimer.End();
+	m_videoTimer.end();
 	ClearStoeredVideoFrame();
 
 	m_hasFirstPaintDataBeenLoaded = false;
@@ -828,7 +838,7 @@ void CMainWindow::UpdatePaintData()
 			{
 				m_pVideoTransferor->Play(pPaintDatum->wstrFilePath.c_str());
 
-				m_videoTimer.Start();
+				m_videoTimer.start();
 			}
 
 			m_nLastVideoIndex = m_nPaintIndex;
@@ -838,7 +848,7 @@ void CMainWindow::UpdatePaintData()
 	{
 		m_nLastVideoIndex = 0;
 		ClearStoeredVideoFrame();
-		m_videoTimer.End();
+		m_videoTimer.end();
 	}
 
 	UpdateScreen();
