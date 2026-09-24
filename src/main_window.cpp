@@ -175,7 +175,7 @@ LRESULT CMainWindow::OnCreate(HWND hWnd)
 	m_pVideoTransferor->SetPlaybackWindow(m_hWnd, EventMessage::kVideoPlayer);
 	m_pVideoTransferor->SetLoop(true);
 
-	m_pD2TextWriter = new CD2TextWriter(m_pD2ImageDrawer->GetD2Factory(), m_pD2ImageDrawer->GetD2DeviceContext());
+	m_pD2TextWriter = new CD2TextWriter(m_pD2ImageDrawer->getD2Factory(), m_pD2ImageDrawer->getD2DeviceContext());
 	m_pD2TextWriter->setupOutLinedDrawing(L"C:\\Windows\\Fonts\\yumindb.ttf");
 
 	m_pViewManager = new CViewManager(m_hWnd);
@@ -244,7 +244,7 @@ LRESULT CMainWindow::OnPaint()
 		return 0;
 	}
 
-	m_pD2ImageDrawer->Clear();
+	m_pD2ImageDrawer->clear();
 
 	bool bRet = false;
 	const adv::PaintDatum* pPaintDatum = GetCurrentPaintData();
@@ -254,10 +254,10 @@ LRESULT CMainWindow::OnPaint()
 		{
 			CComPtr<ID2D1Bitmap> d2d1Bitmap;
 			long long frameTime = 0;
-			bRet = m_pVideoTransferor->TransferVideoFrame(m_pD2ImageDrawer->GetD2DeviceContext(), &d2d1Bitmap, &frameTime);
+			bRet = m_pVideoTransferor->TransferVideoFrame(m_pD2ImageDrawer->getD2DeviceContext(), &d2d1Bitmap, &frameTime);
 			if (bRet)
 			{
-				bRet = m_pD2ImageDrawer->Draw(d2d1Bitmap.p, { m_pViewManager->GetXOffset(), m_pViewManager->GetYOffset() }, m_pViewManager->GetScale());
+				bRet = m_pD2ImageDrawer->scaledDraw(d2d1Bitmap.p, {}, { m_pViewManager->GetXOffset(), m_pViewManager->GetYOffset() }, m_pViewManager->GetScale());
 				if (bRet)
 				{
 					StoreVideoFrame(frameTime, d2d1Bitmap);
@@ -269,7 +269,7 @@ LRESULT CMainWindow::OnPaint()
 				ID2D1Bitmap* p = RestoreVideoFrame(llCurrentTime);
 				if (p != nullptr)
 				{
-					bRet = m_pD2ImageDrawer->Draw(p, { m_pViewManager->GetXOffset(), m_pViewManager->GetYOffset() }, m_pViewManager->GetScale());
+					bRet = m_pD2ImageDrawer->scaledDraw(p, {}, { m_pViewManager->GetXOffset(), m_pViewManager->GetYOffset() }, m_pViewManager->GetScale());
 				}
 			}
 		}
@@ -278,7 +278,7 @@ LRESULT CMainWindow::OnPaint()
 			const auto& iter = m_imageMap.find(pPaintDatum->wstrFilePath);
 			if (iter != m_imageMap.cend())
 			{
-				bRet = m_pD2ImageDrawer->Draw(iter->second.p, { m_pViewManager->GetXOffset(), m_pViewManager->GetYOffset() }, m_pViewManager->GetScale());
+				bRet = m_pD2ImageDrawer->scaledDraw(iter->second.p, {}, { m_pViewManager->GetXOffset(), m_pViewManager->GetYOffset() }, m_pViewManager->GetScale());
 			}
 		}
 	}
@@ -290,7 +290,7 @@ LRESULT CMainWindow::OnPaint()
 			const std::wstring wstr = FormatCurrentText();
 			m_pD2TextWriter->outLinedDraw(wstr.c_str(), static_cast<unsigned long>(wstr.size()));
 		}
-		m_pD2ImageDrawer->Display();
+		m_pD2ImageDrawer->display();
 	}
 
 	::EndPaint(m_hWnd, &ps);
@@ -964,7 +964,7 @@ ID2D1Bitmap* CMainWindow::RestoreVideoFrame(long long llCurrentTime)
 void CMainWindow::CreateImageMap()
 {
 	if (m_pD2ImageDrawer == nullptr)return;
-	ID2D1DeviceContext* const pD2d1DeviceContext = m_pD2ImageDrawer->GetD2DeviceContext();
+	ID2D1DeviceContext* const pD2d1DeviceContext = m_pD2ImageDrawer->getD2DeviceContext();
 	for (const auto& paintDatum : m_paintData)
 	{
 		if (!paintDatum.isVideo)

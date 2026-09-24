@@ -53,20 +53,22 @@ CD2ImageDrawer::CD2ImageDrawer(HWND hWnd)
 	hr = pDxgiFactory2->CreateSwapChainForHwnd(pDxgDevice1, hWnd, &desc, nullptr, nullptr, &m_pDxgiSwapChain1);
 	if (FAILED(hr))return;
 
-	m_pD2d1DeviceContext->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
-	m_pD2d1DeviceContext->SetUnitMode(D2D1_UNIT_MODE_PIXELS);
-	m_pD2d1DeviceContext->SetPrimitiveBlend(D2D1_PRIMITIVE_BLEND_COPY);
+	m_pD2d1DeviceContext->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+	m_pD2d1DeviceContext->SetUnitMode(D2D1_UNIT_MODE_DIPS);
+	m_pD2d1DeviceContext->SetPrimitiveBlend(D2D1_PRIMITIVE_BLEND_SOURCE_OVER);
 
-	D2D1_RENDERING_CONTROLS sRenderings{};
-	m_pD2d1DeviceContext->GetRenderingControls(&sRenderings);
+	D2D1_RENDERING_CONTROLS renderingControls{};
+	m_pD2d1DeviceContext->GetRenderingControls(&renderingControls);
 
-	sRenderings.bufferPrecision = D2D1_BUFFER_PRECISION_8BPC_UNORM_SRGB;
-	m_pD2d1DeviceContext->SetRenderingControls(sRenderings);
+	renderingControls.bufferPrecision = D2D1_BUFFER_PRECISION_8BPC_UNORM_SRGB;
+	m_pD2d1DeviceContext->SetRenderingControls(renderingControls);
 }
 
 CD2ImageDrawer::~CD2ImageDrawer()
 {
-	ReleaseBitmap();
+#ifdef _DEBUG
+	releaseCpuImageBuffer();
+#endif
 
 	if (m_pDxgiSwapChain1 != nullptr)
 	{
@@ -92,69 +94,75 @@ CD2ImageDrawer::~CD2ImageDrawer()
 	}
 }
 
-/*画面消去*/
-void CD2ImageDrawer::Clear(const D2D1::ColorF& colour)
+void CD2ImageDrawer::clear(const D2D1::ColorF& colour)
 {
-	if (m_pD2d1DeviceContext != nullptr)
-	{
-		bool bRet = CheckBufferSize();
-		if (!bRet)return;
-		m_pD2d1DeviceContext->BeginDraw();
-		m_pD2d1DeviceContext->Clear(colour);
-		m_pD2d1DeviceContext->EndDraw();
-	}
+	bool bRet = checkBufferSize();
+	if (!bRet)return;
+
+	m_pD2d1DeviceContext->BeginDraw();
+	m_pD2d1DeviceContext->Clear(colour);
+	m_pD2d1DeviceContext->EndDraw();
 }
-/* CPU画素配列描画*/
-bool CD2ImageDrawer::Draw(const void* srcData, const UINT32 width, const UINT32 height, const UINT32 stride, const D2D_VECTOR_2F fOffset, float fScale)
+#ifdef _DEBUG
+bool CD2ImageDrawer::drawCpuImage(const void* srcData, const UINT32 width, const UINT32 height, const UINT32 stride, const D2D1_POINT_2F& targetOffset, const D2D_VECTOR_2F& sourceOffset, float fScale)
 {
 	if (m_pD2d1DeviceContext == nullptr || m_pDxgiSwapChain1 == nullptr)return false;
 
 	if (srcData == nullptr || width == 0 || height == 0)return false;
 
-	bool bRet = CheckBitmapSize(width, height);
+	bool bRet = checkCpuImageBufferSize(width, height);
 	if (!bRet)return false;
 
 	D2D1_RECT_U rc = { 0, 0, width, height };
-	HRESULT hr = m_pD2d1Bitmap->CopyFromMemory(&rc, srcData, stride);
+	HRESULT hr = m_pCpuImageBuffer->CopyFromMemory(&rc, srcData, stride);
 	if (FAILED(hr))return false;
 
 	CComPtr<ID2D1Effect> pD2d1Effect;
 	hr = m_pD2d1DeviceContext->CreateEffect(CLSID_D2D1Scale, &pD2d1Effect);
 
-	pD2d1Effect->SetInput(0, m_pD2d1Bitmap);
-	hr = pD2d1Effect->SetValue(D2D1_SCALE_PROP_CENTER_POINT, fOffset);
+	pD2d1Effect->SetInput(0, m_pCpuImageBuffer);
+	hr = pD2d1Effect->SetValue(D2D1_SCALE_PROP_CENTER_POINT, sourceOffset);
 	hr = pD2d1Effect->SetValue(D2D1_SCALE_PROP_SCALE, D2D1::Vector2F(fScale, fScale));
 
 	m_pD2d1DeviceContext->BeginDraw();
-	m_pD2d1DeviceContext->DrawImage(pD2d1Effect, D2D1::Point2F(0.f, 0.f), D2D1::RectF(fOffset.x, fOffset.y, width * fScale, height * fScale), D2D1_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC, D2D1_COMPOSITE_MODE_SOURCE_OVER);
+	m_pD2d1DeviceContext->DrawImage(pD2d1Effect, targetOffset, D2D1::RectF(sourceOffset.x, sourceOffset.y, width * fScale, height * fScale), D2D1_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC, D2D1_COMPOSITE_MODE_SOURCE_OVER);
 	m_pD2d1DeviceContext->EndDraw();
 
 	return true;
 }
-/* GPU資源描画 */
-bool CD2ImageDrawer::Draw(ID2D1Bitmap* pD2d1Bitmap, const D2D_VECTOR_2F fOffset, float fScale)
+#endif
+bool CD2ImageDrawer::draw(ID2D1Bitmap* pD2d1Bitmap, const D2D1_POINT_2F* targetOffset, const D2D1_RECT_F* srcRect)
 {
 	if (pD2d1Bitmap == nullptr)return false;
 
-	D2D1_SIZE_U s = pD2d1Bitmap->GetPixelSize();
-	bool bRet = CheckBitmapSize(s.width, s.height);
-	if (!bRet)return false;
+	m_pD2d1DeviceContext->BeginDraw();
+	m_pD2d1DeviceContext->DrawImage(pD2d1Bitmap, targetOffset, srcRect, D2D1_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC, D2D1_COMPOSITE_MODE_SOURCE_OVER);
+	m_pD2d1DeviceContext->EndDraw();
+
+	return true;
+}
+
+bool CD2ImageDrawer::scaledDraw(ID2D1Bitmap* pD2d1Bitmap, const D2D1_POINT_2F& targetOffset, const D2D_VECTOR_2F& sourceOffset, float fScale)
+{
+	if (pD2d1Bitmap == nullptr)return false;
 
 	CComPtr<ID2D1Effect> pD2d1Effect;
 	HRESULT hr = m_pD2d1DeviceContext->CreateEffect(CLSID_D2D1Scale, &pD2d1Effect);
 
 	pD2d1Effect->SetInput(0, pD2d1Bitmap);
-	hr = pD2d1Effect->SetValue(D2D1_SCALE_PROP_CENTER_POINT, fOffset);
+	hr = pD2d1Effect->SetValue(D2D1_SCALE_PROP_CENTER_POINT, sourceOffset);
 	hr = pD2d1Effect->SetValue(D2D1_SCALE_PROP_SCALE, D2D1::Vector2F(fScale, fScale));
 
+	D2D1_SIZE_U s = pD2d1Bitmap->GetPixelSize();
+
 	m_pD2d1DeviceContext->BeginDraw();
-	m_pD2d1DeviceContext->DrawImage(pD2d1Effect, D2D1::Point2F(0.f, 0.f), D2D1::RectF(fOffset.x, fOffset.y, s.width * fScale, s.height * fScale), D2D1_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC, D2D1_COMPOSITE_MODE_SOURCE_OVER);
+	m_pD2d1DeviceContext->DrawImage(pD2d1Effect, targetOffset, D2D1::RectF(sourceOffset.x, sourceOffset.y, s.width * fScale, s.height * fScale), D2D1_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC, D2D1_COMPOSITE_MODE_SOURCE_OVER);
 	m_pD2d1DeviceContext->EndDraw();
 
 	return SUCCEEDED(hr);
 }
-/*転写*/
-void CD2ImageDrawer::Display()
+
+void CD2ImageDrawer::display()
 {
 	if (m_pDxgiSwapChain1 != nullptr)
 	{
@@ -162,49 +170,8 @@ void CD2ImageDrawer::Display()
 		m_pDxgiSwapChain1->Present1(1, 0, &params);
 	}
 }
-/*複写枠解放*/
-void CD2ImageDrawer::ReleaseBitmap()
-{
-	if (m_pD2d1Bitmap != nullptr)
-	{
-		m_pD2d1Bitmap->Release();
-		m_pD2d1Bitmap = nullptr;
-	}
-}
-/*複写枠寸法確認*/
-bool CD2ImageDrawer::CheckBitmapSize(unsigned long uiWidth, unsigned long uiHeight)
-{
-	if (m_pD2d1Bitmap == nullptr)
-	{
-		return CreateBitmapForDrawing(uiWidth, uiHeight);
-	}
-	else
-	{
-		const D2D1_SIZE_U& uBitmapSize = m_pD2d1Bitmap->GetPixelSize();
-		if (uiWidth > uBitmapSize.width && uiHeight > uBitmapSize.height)
-		{
-			return CreateBitmapForDrawing(uiWidth, uiHeight);
-		}
-		else
-		{
-			return true;
-		}
-	}
-	return false;
-}
-/*複写枠作成*/
-bool CD2ImageDrawer::CreateBitmapForDrawing(unsigned long uiWidth, unsigned long uiHeight)
-{
-	ReleaseBitmap();
 
-	HRESULT hr = m_pD2d1DeviceContext->CreateBitmap(D2D1::SizeU(uiWidth, uiHeight),
-		D2D1::BitmapProperties(D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE)),
-		&m_pD2d1Bitmap);
-
-	return SUCCEEDED(hr);
-}
-/*原版寸法確認*/
-bool CD2ImageDrawer::CheckBufferSize()
+bool CD2ImageDrawer::checkBufferSize()
 {
 	if (m_pDxgiSwapChain1 != nullptr)
 	{
@@ -215,14 +182,14 @@ bool CD2ImageDrawer::CheckBufferSize()
 			RECT rc;
 			::GetClientRect(hWnd, &rc);
 
-			unsigned int uiWidth = rc.right - rc.left;
-			unsigned int uiHeight = rc.bottom - rc.top;
+			unsigned int clientWidth = rc.right - rc.left;
+			unsigned int clientHeight = rc.bottom - rc.top;
 
-			if (m_uiWindowWidth != uiWidth || m_uiWindowHeight != uiHeight)
+			if (m_bufferWidth != clientWidth || m_bufferHeight != clientHeight)
 			{
-				m_uiWindowWidth = uiWidth;
-				m_uiWindowHeight = uiHeight;
-				return ResizeBuffer();
+				m_bufferWidth = clientWidth;
+				m_bufferHeight = clientHeight;
+				return resizeBuffer();
 			}
 			else
 			{
@@ -233,14 +200,14 @@ bool CD2ImageDrawer::CheckBufferSize()
 
 	return false;
 }
-/*原版寸法変更*/
-bool CD2ImageDrawer::ResizeBuffer()
+
+bool CD2ImageDrawer::resizeBuffer()
 {
 	if (m_pDxgiSwapChain1 != nullptr && m_pD2d1DeviceContext != nullptr)
 	{
 		m_pD2d1DeviceContext->SetTarget(nullptr);
 
-		HRESULT hr = m_pDxgiSwapChain1->ResizeBuffers(0, m_uiWindowWidth, m_uiWindowHeight, DXGI_FORMAT_B8G8R8A8_UNORM, 0);
+		HRESULT hr = m_pDxgiSwapChain1->ResizeBuffers(0, m_bufferWidth, m_bufferHeight, DXGI_FORMAT_B8G8R8A8_UNORM, 0);
 
 		CComPtr<IDXGISurface> pDxgiSurface;
 		hr = m_pDxgiSwapChain1->GetBuffer(0, IID_PPV_ARGS(&pDxgiSurface));
@@ -251,5 +218,50 @@ bool CD2ImageDrawer::ResizeBuffer()
 		m_pD2d1DeviceContext->SetTarget(pD2d1Bitmap1);
 		return SUCCEEDED(hr);
 	}
+
 	return false;
 }
+#ifdef _DEBUG
+void CD2ImageDrawer::releaseCpuImageBuffer()
+{
+	if (m_pCpuImageBuffer != nullptr)
+	{
+		m_pCpuImageBuffer->Release();
+		m_pCpuImageBuffer = nullptr;
+	}
+}
+
+bool CD2ImageDrawer::checkCpuImageBufferSize(UINT32 width, UINT32 height)
+{
+	if (m_pCpuImageBuffer == nullptr)
+	{
+		return createCouImageBuffer(width, height);
+	}
+	else
+	{
+		const D2D1_SIZE_U& bufferSize = m_pCpuImageBuffer->GetPixelSize();
+		if (width > bufferSize.width && height > bufferSize.height)
+		{
+			return createCouImageBuffer(width, height);
+		}
+		else
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool CD2ImageDrawer::createCouImageBuffer(UINT32 width, UINT32 height)
+{
+	releaseCpuImageBuffer();
+
+	HRESULT hr = m_pD2d1DeviceContext->CreateBitmap(
+		D2D1::SizeU(width, height),
+		D2D1::BitmapProperties(D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE)),
+		&m_pCpuImageBuffer);
+
+	return SUCCEEDED(hr);
+}
+#endif /* _DEBUG */

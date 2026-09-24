@@ -13,30 +13,38 @@ public:
 	CD2ImageDrawer(HWND hWnd);
 	~CD2ImageDrawer();
 
-	void Clear(const D2D1::ColorF& colour = D2D1::ColorF(255, 255, 255, 255));
-	/* Draw CPU Image */
-	bool Draw(const void* srcData, const UINT32 width, const UINT32 height, const UINT32 stride, const D2D_VECTOR_2F fOffset = { 0.f, 0.f }, float fScale = 1.f);
-	/* Draw GPU resource */
-	bool Draw(ID2D1Bitmap* pD2d1Bitmap, const D2D_VECTOR_2F fOffset = { 0.f, 0.f }, float fScale = 1.f);
-	void Display();
+	void clear(const D2D1::ColorF& colour = D2D1::ColorF(255, 255, 255, 255));
+#ifdef _DEBUG
+	/// @brief Draw BGRA32 image 
+	bool drawCpuImage(const void* srcData, const UINT32 width, const UINT32 height, const UINT32 stride, const D2D1_POINT_2F& targetOffset = {}, const D2D_VECTOR_2F& sourceOffset = {}, float fScale = 1.f);
+#endif
+	/// @brief Intended to be used with transform matrix
+	bool draw(ID2D1Bitmap* pD2d1Bitmap, const D2D1_POINT_2F* targetOffset = nullptr, const D2D1_RECT_F* srcRect = nullptr);
+	/// @brief Intended to be used without transform matrix
+	bool scaledDraw(ID2D1Bitmap* pD2d1Bitmap, const D2D1_POINT_2F& targetOffset = {}, const D2D_VECTOR_2F& sourceOffset = {}, float fScale = 1.f);
+	/// @brief Present a frame
+	void display();
 
-	ID2D1Factory1* const GetD2Factory()const { return m_pD2d1Factory1; }
-	ID2D1DeviceContext* const GetD2DeviceContext()const { return m_pD2d1DeviceContext; }
+	ID2D1Factory1* const getD2Factory()const { return m_pD2d1Factory1; }
+	ID2D1DeviceContext* const getD2DeviceContext()const { return m_pD2d1DeviceContext; }
 private:
 	HRESULT m_hrComInit = E_FAIL;
 	ID2D1Factory1* m_pD2d1Factory1 = nullptr;
 	ID2D1DeviceContext* m_pD2d1DeviceContext = nullptr;
 	IDXGISwapChain1* m_pDxgiSwapChain1 = nullptr;
-	ID2D1Bitmap* m_pD2d1Bitmap = nullptr;
 
-	unsigned int m_uiWindowWidth = 0;
-	unsigned int m_uiWindowHeight = 0;
+	unsigned int m_bufferWidth = 0;
+	unsigned int m_bufferHeight = 0;
 
-	void ReleaseBitmap();
-	bool CheckBitmapSize(unsigned long uiWidth, unsigned long uiHeight);
-	bool CreateBitmapForDrawing(unsigned long uiWidth, unsigned long uiHeight);
-	bool CheckBufferSize();
-	bool ResizeBuffer();
+	bool checkBufferSize();
+	bool resizeBuffer();
+#ifdef _DEBUG
+	ID2D1Bitmap* m_pCpuImageBuffer = nullptr;
+
+	void releaseCpuImageBuffer();
+	bool checkCpuImageBufferSize(UINT32 uiWidth, UINT32 uiHeight);
+	bool createCouImageBuffer(UINT32 uiWidth, UINT32 uiHeight);
+#endif
 };
 
 #endif // !D2_IMAGE_DRAWER_H_
