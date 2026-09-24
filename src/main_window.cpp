@@ -176,7 +176,7 @@ LRESULT CMainWindow::OnCreate(HWND hWnd)
 	m_pVideoTransferor->SetLoop(true);
 
 	m_pD2TextWriter = new CD2TextWriter(m_pD2ImageDrawer->GetD2Factory(), m_pD2ImageDrawer->GetD2DeviceContext());
-	m_pD2TextWriter->SetupOutLinedDrawing(L"C:\\Windows\\Fonts\\yumindb.ttf");
+	m_pD2TextWriter->setupOutLinedDrawing(L"C:\\Windows\\Fonts\\yumindb.ttf");
 
 	m_pViewManager = new CViewManager(m_hWnd);
 
@@ -288,7 +288,7 @@ LRESULT CMainWindow::OnPaint()
 		if (!m_isTextHidden && m_pD2TextWriter != nullptr)
 		{
 			const std::wstring wstr = FormatCurrentText();
-			m_pD2TextWriter->OutLinedDraw(wstr.c_str(), static_cast<unsigned long>(wstr.size()));
+			m_pD2TextWriter->outLinedDraw(wstr.c_str(), static_cast<unsigned long>(wstr.size()));
 		}
 		m_pD2ImageDrawer->Display();
 	}
@@ -338,7 +338,7 @@ LRESULT CMainWindow::OnKeyUp(WPARAM wParam, LPARAM lParam)
 	case 'C':
 		if (m_pD2TextWriter != nullptr)
 		{
-			m_pD2TextWriter->SwitchTextColour();
+			m_pD2TextWriter->toggleTextColour();
 			UpdateScreen();
 		}
 		break;
