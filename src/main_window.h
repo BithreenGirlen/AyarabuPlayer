@@ -99,7 +99,7 @@ private:
 	CD2TextWriter* m_pD2TextWriter = nullptr;
 	CMfMediaPlayer* m_pAudioPlayer = nullptr;
 	CMfVideoTransferor* m_pVideoTransferor = nullptr;
-	CViewManager* m_pViewManager = nullptr;
+	CViewManager m_viewManager;
 
 	std::vector<adv::TextDatum> m_textData;
 

@@ -177,8 +177,7 @@ LRESULT CMainWindow::OnCreate(HWND hWnd)
 
 	m_pD2TextWriter = new CD2TextWriter(m_pD2ImageDrawer->getD2Factory(), m_pD2ImageDrawer->getD2DeviceContext());
 	m_pD2TextWriter->setupOutLinedDrawing(L"C:\\Windows\\Fonts\\yumindb.ttf");
-
-	m_pViewManager = new CViewManager(m_hWnd);
+	m_pD2TextWriter->onDpiChanged(::GetDpiForWindow(m_hWnd));
 
 	return 0;
 }
@@ -220,12 +219,6 @@ LRESULT CMainWindow::OnClose()
 		m_pVideoTransferor = nullptr;
 	}
 
-	if (m_pViewManager != nullptr)
-	{
-		delete m_pViewManager;
-		m_pViewManager = nullptr;
-	}
-
 	::DestroyWindow(m_hWnd);
 	::UnregisterClassW(m_swzClassName, m_hInstance);
 
@@ -238,7 +231,7 @@ LRESULT CMainWindow::OnPaint()
 	HDC hdc = ::BeginPaint(m_hWnd, &ps);
 
 	if (m_pD2ImageDrawer == nullptr || m_pVideoTransferor == nullptr || m_pD2TextWriter == nullptr
-		|| m_pViewManager == nullptr || m_nPaintIndex >= m_paintData.size())
+		|| m_nPaintIndex >= m_paintData.size())
 	{
 		::EndPaint(m_hWnd, &ps);
 		return 0;
@@ -257,7 +250,7 @@ LRESULT CMainWindow::OnPaint()
 			bRet = m_pVideoTransferor->TransferVideoFrame(m_pD2ImageDrawer->getD2DeviceContext(), &d2d1Bitmap, &frameTime);
 			if (bRet)
 			{
-				bRet = m_pD2ImageDrawer->scaledDraw(d2d1Bitmap.p, {}, { m_pViewManager->GetXOffset(), m_pViewManager->GetYOffset() }, m_pViewManager->GetScale());
+				bRet = m_pD2ImageDrawer->scaledDraw(d2d1Bitmap.p, {}, { m_viewManager.getOffsetX(), m_viewManager.getOffsetY() }, m_viewManager.getScale());
 				if (bRet)
 				{
 					StoreVideoFrame(frameTime, d2d1Bitmap);
@@ -269,7 +262,7 @@ LRESULT CMainWindow::OnPaint()
 				ID2D1Bitmap* p = RestoreVideoFrame(llCurrentTime);
 				if (p != nullptr)
 				{
-					bRet = m_pD2ImageDrawer->scaledDraw(p, {}, { m_pViewManager->GetXOffset(), m_pViewManager->GetYOffset() }, m_pViewManager->GetScale());
+					bRet = m_pD2ImageDrawer->scaledDraw(p, {}, { m_viewManager.getOffsetX(), m_viewManager.getOffsetY() }, m_viewManager.getScale());
 				}
 			}
 		}
@@ -278,7 +271,7 @@ LRESULT CMainWindow::OnPaint()
 			const auto& iter = m_imageMap.find(pPaintDatum->wstrFilePath);
 			if (iter != m_imageMap.cend())
 			{
-				bRet = m_pD2ImageDrawer->scaledDraw(iter->second.p, {}, { m_pViewManager->GetXOffset(), m_pViewManager->GetYOffset() }, m_pViewManager->GetScale());
+				bRet = m_pD2ImageDrawer->scaledDraw(iter->second.p, {}, { m_viewManager.getOffsetX(), m_viewManager.getOffsetY() }, m_viewManager.getScale());
 			}
 		}
 	}
@@ -422,14 +415,11 @@ LRESULT CMainWindow::OnMouseMove(WPARAM wParam, LPARAM lParam)
 
 		if (m_hasLeftBeenDragged)
 		{
-			if (m_pViewManager != nullptr)
-			{
-				int iX = m_lastCursorPos.x - pt.x;
-				int iY = m_lastCursorPos.y - pt.y;
+			int iX = m_lastCursorPos.x - pt.x;
+			int iY = m_lastCursorPos.y - pt.y;
 
-				m_pViewManager->SetOffset(iX, iY);
-				UpdateScreen();
-			}
+			m_viewManager.addOffset(iX, iY);
+			UpdateScreen();
 		}
 
 		m_lastCursorPos = pt;
@@ -457,10 +447,7 @@ LRESULT CMainWindow::OnMouseWheel(WPARAM wParam, LPARAM lParam)
 	}
 	else
 	{
-		if (m_pViewManager != nullptr)
-		{
-			m_pViewManager->Rescale(iScroll > 0);
-		}
+		m_viewManager.rescale(iScroll > 0);
 	}
 
 	return 0;
@@ -568,10 +555,7 @@ LRESULT CMainWindow::OnMButtonUp(WPARAM wParam, LPARAM lParam)
 	WORD usKey = LOWORD(wParam);
 	if (usKey == 0)
 	{
-		if (m_pViewManager != nullptr)
-		{
-			m_pViewManager->ResetZoom();
-		}
+		m_viewManager.resetScale();
 	}
 
 	if (usKey == MK_RBUTTON)
@@ -740,10 +724,7 @@ void CMainWindow::ToggleWindowFrameStyle()
 		::SetMenu(m_hWnd, m_hMenuBar);
 	}
 
-	if (m_pViewManager != nullptr)
-	{
-		m_pViewManager->OnStyleChanged();
-	}
+	m_viewManager.onStyleChanged();
 }
 
 void CMainWindow::UpdateMenuItemState() const
@@ -983,8 +964,8 @@ void CMainWindow::CreateImageMap()
 						if (!m_hasFirstPaintDataBeenLoaded)
 						{
 							const D2D1_SIZE_F& size = pD2d1Bitmap->GetSize();
-							m_pViewManager->SetBaseSize(static_cast<unsigned int>(size.width), static_cast<unsigned int>(size.height));
-							m_pViewManager->ResetZoom();
+							m_viewManager.setBaseSize(m_hWnd, static_cast<unsigned int>(size.width), static_cast<unsigned int>(size.height));
+							m_viewManager.resetScale();
 
 							m_hasFirstPaintDataBeenLoaded = true;
 						}
@@ -1031,11 +1012,9 @@ void CMainWindow::OnVideoPlayerEvent(unsigned long ulEvent, DWORD_PTR param1)
 				bool bRet = m_pVideoTransferor->GetVideoSize(&ulWidth, &ulHeight);
 				if (bRet)
 				{
-					if (m_pViewManager != nullptr)
-					{
-						m_pViewManager->SetBaseSize(ulWidth, ulHeight);
-						m_pViewManager->ResetZoom();
-					}
+					m_viewManager.setBaseSize(m_hWnd, ulWidth, ulHeight);
+					m_viewManager.resetScale();
+
 					m_hasFirstPaintDataBeenLoaded = true;
 				}
 			}
