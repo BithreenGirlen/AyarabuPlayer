@@ -21,7 +21,7 @@ CMediaSettingDialogue::~CMediaSettingDialogue()
     }
 }
 
-bool CMediaSettingDialogue::Open(HINSTANCE hInstance, HWND hWnd, void* pMediaPlayer, const wchar_t* pwzWindowName)
+bool CMediaSettingDialogue::open(HINSTANCE hInstance, HWND hWnd, void* pMediaPlayer, const wchar_t* pwzWindowName)
 {
     WNDCLASSEXW wcex{};
 
@@ -54,7 +54,7 @@ bool CMediaSettingDialogue::Open(HINSTANCE hInstance, HWND hWnd, void* pMediaPla
             ownerPos.x, ownerPos.y, iWindowWidth, iWindowHeight, hWnd, nullptr, hInstance, this);
         if (m_hWnd != nullptr)
         {
-            MessageLoop();
+            messageLoop();
             return true;
         }
     }
@@ -62,7 +62,7 @@ bool CMediaSettingDialogue::Open(HINSTANCE hInstance, HWND hWnd, void* pMediaPla
 	return false;
 }
 
-int CMediaSettingDialogue::MessageLoop()
+int CMediaSettingDialogue::messageLoop()
 {
     MSG msg;
 
@@ -102,40 +102,40 @@ LRESULT CMediaSettingDialogue::WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
     pThis = reinterpret_cast<CMediaSettingDialogue*>(::GetWindowLongPtr(hWnd, GWLP_USERDATA));
     if (pThis != nullptr)
     {
-        return pThis->HandleMessage(hWnd, uMsg, wParam, lParam);
+        return pThis->handleMessage(hWnd, uMsg, wParam, lParam);
     }
 
     return ::DefWindowProcW(hWnd, uMsg, wParam, lParam);
 }
 /*メッセージ処理*/
-LRESULT CMediaSettingDialogue::HandleMessage(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+LRESULT CMediaSettingDialogue::handleMessage(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
     case WM_CREATE:
-        return OnCreate(hWnd);
+        return onCreate(hWnd);
     case WM_DESTROY:
-        return OnDestroy();
+        return onDestroy();
     case WM_CLOSE:
-        return OnClose();
+        return onClose();
     case WM_PAINT:
-        return OnPaint();
+        return onPaint();
     case WM_SIZE:
-        return OnSize();
+        return onSize();
     case WM_VSCROLL:
-        return OnVScroll(wParam, lParam);
+        return onVScroll(wParam, lParam);
     case WM_COMMAND:
-        return OnCommand(wParam, lParam);
+        return onCommand(wParam, lParam);
     }
 
     return ::DefWindowProcW(hWnd, uMsg, wParam, lParam);
 }
 /*WM_CREATE*/
-LRESULT CMediaSettingDialogue::OnCreate(HWND hWnd)
+LRESULT CMediaSettingDialogue::onCreate(HWND hWnd)
 {
     m_hWnd = hWnd;
 
-    CreateSliders();
+    createSliders();
     m_hVolumeText = ::CreateWindowExW(0, WC_STATICW, L"Volume", WS_VISIBLE | WS_CHILD | WS_TABSTOP, 0, 0, 0, 0, m_hWnd, nullptr, m_hInstance, nullptr);
     m_hRateText = ::CreateWindowExW(0, WC_STATICW, L"Rate", WS_VISIBLE | WS_CHILD | WS_TABSTOP, 0, 0, 0, 0, m_hWnd, nullptr, m_hInstance, nullptr);
 
@@ -148,13 +148,13 @@ LRESULT CMediaSettingDialogue::OnCreate(HWND hWnd)
     return 0;
 }
 /*WM_DESTROY*/
-LRESULT CMediaSettingDialogue::OnDestroy()
+LRESULT CMediaSettingDialogue::onDestroy()
 {
     ::PostQuitMessage(0);
     return 0;
 }
 /*WM_CLOSE*/
-LRESULT CMediaSettingDialogue::OnClose()
+LRESULT CMediaSettingDialogue::onClose()
 {
     HWND hOwnerWnd = ::GetWindow(m_hWnd, GW_OWNER);
     ::EnableWindow(hOwnerWnd, TRUE);
@@ -166,7 +166,7 @@ LRESULT CMediaSettingDialogue::OnClose()
     return 0;
 }
 /*WM_PAINT*/
-LRESULT CMediaSettingDialogue::OnPaint()
+LRESULT CMediaSettingDialogue::onPaint()
 {
     PAINTSTRUCT ps;
     HDC hdc = ::BeginPaint(m_hWnd, &ps);
@@ -176,7 +176,7 @@ LRESULT CMediaSettingDialogue::OnPaint()
     return 0;
 }
 /*WM_SIZE*/
-LRESULT CMediaSettingDialogue::OnSize()
+LRESULT CMediaSettingDialogue::onSize()
 {
     RECT rect;
     ::GetClientRect(m_hWnd, &rect);
@@ -213,7 +213,7 @@ LRESULT CMediaSettingDialogue::OnSize()
     return 0;
 }
 /*WM_VSCROLL*/
-LRESULT CMediaSettingDialogue::OnVScroll(WPARAM wParam, LPARAM lParam)
+LRESULT CMediaSettingDialogue::onVScroll(WPARAM wParam, LPARAM lParam)
 {
     CMfMediaPlayer* pPlayer = static_cast<CMfMediaPlayer*>(m_pMediaPlayer);
     if (pPlayer != nullptr)
@@ -223,18 +223,18 @@ LRESULT CMediaSettingDialogue::OnVScroll(WPARAM wParam, LPARAM lParam)
         if (hScroll == m_hVolumeSlider)
         {
             double dbVolume = ::SendMessage(m_hVolumeSlider, TBM_GETPOS, 0, 0) / 100.0;
-            if (dbVolume != pPlayer->GetCurrentVolume())
+            if (dbVolume != pPlayer->getCurrentVolume())
             {
-                pPlayer->SetCurrentVolume(dbVolume);
+                pPlayer->setCurrentVolume(dbVolume);
             }
         }
 
         if (hScroll == m_hRateSlider)
         {
             double dbRate = ::SendMessage(m_hRateSlider, TBM_GETPOS, 0, 0) / 10.0;
-            if (dbRate != pPlayer->GetCurrentRate())
+            if (dbRate != pPlayer->getCurrentRate())
             {
-                pPlayer->SetCurrentRate(dbRate);
+                pPlayer->setCurrentRate(dbRate);
             }
         }
     }
@@ -242,7 +242,7 @@ LRESULT CMediaSettingDialogue::OnVScroll(WPARAM wParam, LPARAM lParam)
     return 0;
 }
 /*WM_COMMAND*/
-LRESULT CMediaSettingDialogue::OnCommand(WPARAM wParam, LPARAM lParam)
+LRESULT CMediaSettingDialogue::onCommand(WPARAM wParam, LPARAM lParam)
 {
     int wmId = LOWORD(wParam);
     int wmKind = LOWORD(lParam);
@@ -258,7 +258,7 @@ LRESULT CMediaSettingDialogue::OnCommand(WPARAM wParam, LPARAM lParam)
     return 0;
 }
 /*音量調整・再生速度変更スライダ作成*/
-void CMediaSettingDialogue::CreateSliders()
+void CMediaSettingDialogue::createSliders()
 {
     m_hVolumeSlider = ::CreateWindowExW(0, TRACKBAR_CLASSW, L"Volume Slider",
         WS_VISIBLE | WS_CHILD | WS_TABSTOP | TBS_VERT | TBS_TOOLTIPS | TBS_BOTH,
@@ -282,24 +282,24 @@ void CMediaSettingDialogue::CreateSliders()
         ::SendMessage(m_hRateSlider, TBM_SETPAGESIZE, TRUE, 1);
     }
 
-    SetSliderPosition();
+    setSliderPosition();
 
 }
 /*現在値取得・表示*/
-void CMediaSettingDialogue::SetSliderPosition()
+void CMediaSettingDialogue::setSliderPosition()
 {
     CMfMediaPlayer* pPlayer = static_cast<CMfMediaPlayer*>(m_pMediaPlayer);
     if (pPlayer != nullptr)
     {
         if (m_hVolumeSlider != nullptr)
         {
-            double dbVolume = pPlayer->GetCurrentVolume() * 100.0;
+            double dbVolume = pPlayer->getCurrentVolume() * 100.0;
             ::SendMessage(m_hVolumeSlider, TBM_SETPOS, TRUE, static_cast<LPARAM>(dbVolume));
         }
 
         if (m_hRateSlider != nullptr)
         {
-            double dbRate = pPlayer->GetCurrentRate() * 10.0;
+            double dbRate = pPlayer->getCurrentRate() * 10.0;
             ::SendMessage(m_hRateSlider, TBM_SETPOS, TRUE, static_cast<LPARAM>(dbRate));
         }
     }

@@ -34,8 +34,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	bool bRet = mainWindow.Create(hInstance);
 	if (bRet)
 	{
-		::ShowWindow(mainWindow.GetHwnd(), nCmdShow);
-		iRet = mainWindow.MessageLoop();
+		::ShowWindow(mainWindow.getHwnd(), nCmdShow);
+		iRet = mainWindow.messageLoop();
 	}
 
 	return iRet;

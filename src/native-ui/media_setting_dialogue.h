@@ -9,10 +9,10 @@ public:
 	CMediaSettingDialogue();
 	~CMediaSettingDialogue();
 
-	bool Open(HINSTANCE hInstance, HWND hWnd, void* pMediaPlayer, const wchar_t* pwzWindowName);
-	int MessageLoop();
+	bool open(HINSTANCE hInstance, HWND hWnd, void* pMediaPlayer, const wchar_t* pwzWindowName);
+	int messageLoop();
 
-	HWND GetHwnd()const { return m_hWnd; }
+	HWND getHwnd()const noexcept { return m_hWnd; }
 private:
 	const wchar_t* m_swzClassName = L"Media player setting dialogue";
 	HINSTANCE m_hInstance = nullptr;
@@ -21,14 +21,14 @@ private:
 	void* m_pMediaPlayer = nullptr;
 
 	static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-	LRESULT HandleMessage(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-	LRESULT OnCreate(HWND hWnd);
-	LRESULT OnDestroy();
-	LRESULT OnClose();
-	LRESULT OnPaint();
-	LRESULT OnSize();
-	LRESULT OnVScroll(WPARAM wParam, LPARAM lParam);
-	LRESULT OnCommand(WPARAM wParam, LPARAM lParam);
+	LRESULT handleMessage(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+	LRESULT onCreate(HWND hWnd);
+	LRESULT onDestroy();
+	LRESULT onClose();
+	LRESULT onPaint();
+	LRESULT onSize();
+	LRESULT onVScroll(WPARAM wParam, LPARAM lParam);
+	LRESULT onCommand(WPARAM wParam, LPARAM lParam);
 
 	enum Constants { kFontSize = 16, kTextWidth = 70};
 	enum Controls{kVolumeSlider = 1, kRateSkuder};
@@ -38,8 +38,8 @@ private:
 	HWND m_hRateSlider = nullptr;
 	HWND m_hRateText = nullptr;
 
-	void CreateSliders();
-	void SetSliderPosition();
+	void createSliders();
+	void setSliderPosition();
 	static BOOL CALLBACK SetFontCallback(HWND hWnd, LPARAM lParam);
 };
 
