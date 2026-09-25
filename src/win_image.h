@@ -7,20 +7,25 @@ namespace win_image
 {
 	struct SImageFrame
 	{
-		unsigned int uiWidth = 0;
-		unsigned int uiHeight = 0;
-		unsigned int uiStride = 0;
+		unsigned int width = 0;
+		unsigned int height = 0;
+		unsigned int stride = 0;
 		std::vector<unsigned char> pixels;
 	};
 
-	enum class ERotation
+	enum class ERotation : uint8_t
 	{
-		None, Deg90, Deg180, Deg270
+		None = 0, Deg90, Deg180, Deg270
 	};
 
-	bool LoadImageToMemory(const wchar_t* filePath, SImageFrame* pImageFrame, float fScale = 1.f, ERotation rotation = ERotation::None);
+	enum class EAlpha : uint8_t
+	{
+		Normal = 0, Premultiplied
+	};
+
+	bool LoadImageToMemory(const wchar_t* filePath, SImageFrame* pImageFrame, float fScale = 1.f, ERotation rotation = ERotation::None, EAlpha alpha = EAlpha::Normal);
 	/// @brief Pass `IWICBitmap**` to the second argument.
-	bool LoadImageToWicBitmap(const wchar_t* filePath, void** pWicBitmap, float fScale = 1.f, ERotation rotation = ERotation::None);
+	bool LoadImageToWicBitmap(const wchar_t* filePath, void** pWicBitmap, float fScale = 1.f, ERotation rotation = ERotation::None, EAlpha alpha = EAlpha::Normal);
 
 	bool SkimImageSize(const wchar_t* filePath, unsigned int* width, unsigned int* height);
 
@@ -33,12 +38,12 @@ namespace win_image
 		CWicGifEncoder();
 		~CWicGifEncoder();
 
-		bool Initialise(const wchar_t* filePath);
-		bool HasBeenInitialised() const;
+		bool initialise(const wchar_t* filePath);
+		bool hasBeenInitialised() const;
+		/// @brief Assume that pixel format is RGBA32
+		bool commitFrame(unsigned int width, unsigned int height, unsigned int stride, unsigned char* pixels, bool hasAlpha, float delayInSeconds);
 
-		bool CommitFrame(unsigned int width, unsigned int height, unsigned int stride, unsigned char* pixels, bool hasAlpha, float delayInSeconds);
-
-		bool Finalise();
+		bool finalise();
 	private:
 		class Impl;
 		Impl* m_impl = nullptr;
