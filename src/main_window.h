@@ -97,8 +97,8 @@ private:
 
 	CD2ImageDrawer* m_pD2ImageDrawer = nullptr;
 	CD2TextWriter* m_pD2TextWriter = nullptr;
-	CMfMediaPlayer* m_pAudioPlayer = nullptr;
-	CMfVideoTransferor* m_pVideoTransferor = nullptr;
+	CMfMediaPlayer m_audioPlayer;
+	CMfVideoTransferor m_videoTransferor;
 	CViewManager m_viewManager;
 
 	std::vector<adv::TextDatum> m_textData;

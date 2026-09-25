@@ -168,12 +168,10 @@ LRESULT CMainWindow::OnCreate(HWND hWnd)
 
 	m_pD2ImageDrawer = new CD2ImageDrawer(m_hWnd);
 
-	m_pAudioPlayer = new CMfMediaPlayer();
-	m_pAudioPlayer->SetPlaybackWindow(m_hWnd, EventMessage::kAudioPlayer);
+	m_audioPlayer.SetPlaybackWindow(m_hWnd, EventMessage::kAudioPlayer);
 
-	m_pVideoTransferor = new CMfVideoTransferor();
-	m_pVideoTransferor->SetPlaybackWindow(m_hWnd, EventMessage::kVideoPlayer);
-	m_pVideoTransferor->SetLoop(true);
+	m_videoTransferor.SetPlaybackWindow(m_hWnd, EventMessage::kVideoPlayer);
+	m_videoTransferor.SetLoop(true);
 
 	m_pD2TextWriter = new CD2TextWriter(m_pD2ImageDrawer->getD2Factory(), m_pD2ImageDrawer->getD2DeviceContext());
 	m_pD2TextWriter->setupOutLinedDrawing(L"C:\\Windows\\Fonts\\yumindb.ttf");
@@ -207,18 +205,6 @@ LRESULT CMainWindow::OnClose()
 		m_pD2ImageDrawer = nullptr;
 	}
 
-	if (m_pAudioPlayer != nullptr)
-	{
-		delete m_pAudioPlayer;
-		m_pAudioPlayer = nullptr;
-	}
-
-	if (m_pVideoTransferor != nullptr)
-	{
-		delete m_pVideoTransferor;
-		m_pVideoTransferor = nullptr;
-	}
-
 	::DestroyWindow(m_hWnd);
 	::UnregisterClassW(m_swzClassName, m_hInstance);
 
@@ -230,8 +216,7 @@ LRESULT CMainWindow::OnPaint()
 	PAINTSTRUCT ps;
 	HDC hdc = ::BeginPaint(m_hWnd, &ps);
 
-	if (m_pD2ImageDrawer == nullptr || m_pVideoTransferor == nullptr || m_pD2TextWriter == nullptr
-		|| m_nPaintIndex >= m_paintData.size())
+	if (m_pD2ImageDrawer == nullptr || m_pD2TextWriter == nullptr || m_nPaintIndex >= m_paintData.size())
 	{
 		::EndPaint(m_hWnd, &ps);
 		return 0;
@@ -247,7 +232,7 @@ LRESULT CMainWindow::OnPaint()
 		{
 			CComPtr<ID2D1Bitmap> d2d1Bitmap;
 			long long frameTime = 0;
-			bRet = m_pVideoTransferor->TransferVideoFrame(m_pD2ImageDrawer->getD2DeviceContext(), &d2d1Bitmap, &frameTime);
+			bRet = m_videoTransferor.TransferVideoFrame(m_pD2ImageDrawer->getD2DeviceContext(), &d2d1Bitmap, &frameTime);
 			if (bRet)
 			{
 				bRet = m_pD2ImageDrawer->scaledDraw(d2d1Bitmap.p, {}, { m_viewManager.getOffsetX(), m_viewManager.getOffsetY() }, m_viewManager.getScale());
@@ -258,7 +243,7 @@ LRESULT CMainWindow::OnPaint()
 			}
 			else
 			{
-				long long llCurrentTime = m_pVideoTransferor->GetCurrentTimeInMilliSeconds();
+				long long llCurrentTime = m_videoTransferor.GetCurrentTimeInMilliSeconds();
 				ID2D1Bitmap* p = RestoreVideoFrame(llCurrentTime);
 				if (p != nullptr)
 				{
@@ -391,12 +376,9 @@ LRESULT CMainWindow::OnTimer(WPARAM wParam)
 	switch (wParam)
 	{
 	case Timer::kText:
-		if (m_pAudioPlayer != nullptr)
+		if (m_audioPlayer.IsEnded())
 		{
-			if (m_pAudioPlayer->IsEnded())
-			{
-				AutoTexting();
-			}
+			AutoTexting();
 		}
 		break;
 	default:
@@ -494,9 +476,9 @@ LRESULT CMainWindow::OnLButtonUp(WPARAM wParam, LPARAM lParam)
 
 		if (iX == 0 && iY == 0)
 		{
-			if (m_pVideoTransferor->IsPaused())
+			if (m_videoTransferor.IsPaused())
 			{
-				m_pVideoTransferor->FrameStep(true);
+				m_videoTransferor.FrameStep(true);
 			}
 			else
 			{
@@ -647,32 +629,23 @@ void CMainWindow::MenuOnForeFile()
 /*音声設定画面呼び出し*/
 void CMainWindow::MenuOnAudioSetting()
 {
-	if (m_pAudioPlayer != nullptr)
-	{
-		CMediaSettingDialogue mediaSettingDialogue;
-		mediaSettingDialogue.Open(m_hInstance, m_hWnd, m_pAudioPlayer, L"Audio");
-	}
+	CMediaSettingDialogue mediaSettingDialogue;
+	mediaSettingDialogue.Open(m_hInstance, m_hWnd, &m_audioPlayer, L"Audio");
 }
 /*動画設定画面呼び出し*/
 void CMainWindow::MenuOnVideoSetting()
 {
-	if (m_pVideoTransferor != nullptr)
-	{
-		CMediaSettingDialogue mediaSettingDialogue;
-		mediaSettingDialogue.Open(m_hInstance, m_hWnd, m_pVideoTransferor, L"Video");
-	}
+	CMediaSettingDialogue mediaSettingDialogue;
+	mediaSettingDialogue.Open(m_hInstance, m_hWnd, &m_videoTransferor, L"Video");
 }
 /*動画一時停止*/
 void CMainWindow::MenuOnPauseVideo()
 {
-	if (m_pVideoTransferor != nullptr)
+	bool toBePaused = !m_videoTransferor.IsPaused();
+	bool bRet = m_videoTransferor.SetPause(toBePaused);
+	if (bRet)
 	{
-		bool toBePaused = !m_pVideoTransferor->IsPaused();
-		bool bRet = m_pVideoTransferor->SetPause(toBePaused);
-		if (bRet)
-		{
-			window_menu::SetMenuCheckState(window_menu::GetMenuInBar(m_hWnd, MenuBar::kImage), Menu::kPauseVideo, toBePaused);
-		}
+		window_menu::SetMenuCheckState(window_menu::GetMenuInBar(m_hWnd, MenuBar::kImage), Menu::kPauseVideo, toBePaused);
 	}
 }
 void CMainWindow::MenuOnSyncImage()
@@ -815,12 +788,9 @@ void CMainWindow::UpdatePaintData()
 		{
 			ClearStoeredVideoFrame();
 
-			if (m_pVideoTransferor != nullptr)
-			{
-				m_pVideoTransferor->Play(pPaintDatum->wstrFilePath.c_str());
+			m_videoTransferor.Play(pPaintDatum->wstrFilePath.c_str());
 
-				m_videoTimer.start();
-			}
+			m_videoTimer.start();
 
 			m_nLastVideoIndex = m_nPaintIndex;
 		}
@@ -867,10 +837,7 @@ void CMainWindow::UpdateText()
 			const adv::TextDatum& t = m_textData[nTextIndex];
 			if (!t.wstrVoicePath.empty())
 			{
-				if (m_pAudioPlayer != nullptr)
-				{
-					m_pAudioPlayer->Play(t.wstrVoicePath.c_str());
-				}
+				m_audioPlayer.Play(t.wstrVoicePath.c_str());
 			}
 			constexpr unsigned int kTimerInterval = 2000;
 			::SetTimer(m_hWnd, Timer::kText, kTimerInterval, nullptr);
@@ -1003,20 +970,17 @@ void CMainWindow::OnVideoPlayerEvent(unsigned long ulEvent, DWORD_PTR param1)
 	switch (ulEvent)
 	{
 	case MF_MEDIA_ENGINE_EVENT_LOADEDMETADATA:
-		if (m_pVideoTransferor != nullptr)
+		if (!m_hasFirstPaintDataBeenLoaded)
 		{
-			if (!m_hasFirstPaintDataBeenLoaded)
+			unsigned long ulWidth = 0;
+			unsigned long ulHeight = 0;
+			bool bRet = m_videoTransferor.GetVideoSize(&ulWidth, &ulHeight);
+			if (bRet)
 			{
-				unsigned long ulWidth = 0;
-				unsigned long ulHeight = 0;
-				bool bRet = m_pVideoTransferor->GetVideoSize(&ulWidth, &ulHeight);
-				if (bRet)
-				{
-					m_viewManager.setBaseSize(m_hWnd, ulWidth, ulHeight);
-					m_viewManager.resetScale();
+				m_viewManager.setBaseSize(m_hWnd, ulWidth, ulHeight);
+				m_viewManager.resetScale();
 
-					m_hasFirstPaintDataBeenLoaded = true;
-				}
+				m_hasFirstPaintDataBeenLoaded = true;
 			}
 		}
 		break;
