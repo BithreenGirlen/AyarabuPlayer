@@ -315,11 +315,11 @@ namespace ayarabu
 
 		std::wstring wstrFolderPath = g_wstrVoiceFolderPath;
 		wstrFolderPath.append(L"\\").append(win_text::WidenUtf8(&strFilePathFormat[0], static_cast<int>(nFormatPos))).push_back('3');
-		win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".m4a", voiceFilePaths);
+		win_filesystem::CreateFilePathList(wstrFolderPath, L".m4a", voiceFilePaths);
 
 		size_t nIntroVoiceFileCount = voiceFilePaths.size();
 		wstrFolderPath.back() = L'4';
-		win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".m4a", voiceFilePaths);
+		win_filesystem::CreateFilePathList(wstrFolderPath, L".m4a", voiceFilePaths);
 
 		return nIntroVoiceFileCount;
 	}
@@ -393,11 +393,11 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 	std::vector<std::wstring> stillIFilePaths;
 	std::wstring wstrFolderPath = g_wstrStillFolderPath;
 	wstrFolderPath.append(L"\\advstill").append(wstrImageId);
-	win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".png", stillIFilePaths);
+	win_filesystem::CreateFilePathList(wstrFolderPath, L".png", stillIFilePaths);
 
 	std::vector<std::wstring> videoFilePaths;
 	wstrFolderPath.assign(g_wstrVideoFolderPath).append(L"\\chara").append(wstrImageId);
-	win_filesystem::CreateFilePathList(wstrFolderPath.c_str(), L".mp4", videoFilePaths);
+	win_filesystem::CreateFilePathList(wstrFolderPath, L".mp4", videoFilePaths);
 
 	std::wstring labelCaptionBuffer;
 	size_t nLastPaintIndex = 0;
