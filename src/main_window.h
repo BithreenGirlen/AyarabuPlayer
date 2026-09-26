@@ -6,7 +6,7 @@
 
 #include <string>
 #include <vector>
-#include <unordered_map>
+#include <map>
 
 #include "d2_image_drawer.h"
 #include "d2_text_writer.h"
@@ -130,12 +130,12 @@ private:
 	const adv::PaintDatum* getCurrentPaintData();
 	std::wstring formatCurrentText();
 
-	std::unordered_map<long long, CComPtr<ID2D1Bitmap>> m_storedVideoFrames;
+	std::map<long long, CComPtr<ID2D1Bitmap>> m_storedVideoFrames;
 	void storeVideoFrame(long long llCurrentTime, CComPtr<ID2D1Bitmap> pD2D1Bitmap);
 	void clearStoeredVideoFrame();
 	ID2D1Bitmap* restoreVideoFrame(long long llCurrentTime);
 
-	std::unordered_map<std::wstring, CComPtr<ID2D1Bitmap>> m_imageMap;
+	std::map<std::wstring, CComPtr<ID2D1Bitmap>> m_imageMap;
 	void createImageMap();
 	void clearImageMap();
 
