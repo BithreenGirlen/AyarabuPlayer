@@ -152,7 +152,7 @@ LRESULT CMainWindow::onCreate(HWND hWnd)
 
 	initialiseMenuBar();
 	updateMenuItemState();
-	window_menu::SetMenuCheckState(window_menu::GetMenuInBar(m_hWnd, MenuBar::kImage), Menu::kSyncImage, m_isImageSynced);
+	window_menu::SetMenuCheckState(window_menu::GetMenuInBar(m_hWnd, MenuBar::kImage), Menu::kSyncImage, m_sceneState.isImageSynced);
 
 	static const auto TimerCallback = [](void* pUserData)
 		-> void
@@ -263,7 +263,7 @@ LRESULT CMainWindow::onPaint()
 
 	if (bRet)
 	{
-		if (!m_isTextHidden && m_pD2TextWriter != nullptr)
+		if (!m_sceneState.isTextHidden && m_pD2TextWriter != nullptr)
 		{
 			m_pD2TextWriter->outLinedDraw(m_formattedText.c_str(), static_cast<unsigned long>(m_formattedText.size()));
 		}
@@ -320,7 +320,7 @@ LRESULT CMainWindow::onKeyUp(WPARAM wParam, LPARAM lParam)
 		}
 		break;
 	case 'T':
-		m_isTextHidden ^= true;
+		m_sceneState.isTextHidden ^= true;
 		updateScreen();
 		break;
 	}
@@ -388,23 +388,23 @@ LRESULT CMainWindow::onTimer(WPARAM wParam)
 /* WM_MOUSEMOVE */
 LRESULT CMainWindow::onMouseMove(WPARAM wParam, LPARAM lParam)
 {
-	WORD usKey = LOWORD(wParam);
-	if (usKey == MK_LBUTTON)
+	WORD pressedKeys = LOWORD(wParam);
+	if (pressedKeys == MK_LBUTTON)
 	{
 		POINT pt{};
 		::GetCursorPos(&pt);
 
-		if (m_hasLeftBeenDragged)
+		if (m_mouseState.hasLeftBeenDragged)
 		{
-			int iX = m_lastCursorPos.x - pt.x;
-			int iY = m_lastCursorPos.y - pt.y;
+			int iDeltaX = m_mouseState.lastCursorPos.x - pt.x;
+			int iDeltaY = m_mouseState.lastCursorPos.y - pt.y;
 
-			m_viewManager.addOffset(iX, iY);
+			m_viewManager.addOffset(iDeltaX, iDeltaY);
 			updateScreen();
 		}
 
-		m_lastCursorPos = pt;
-		m_hasLeftBeenDragged = true;
+		m_mouseState.lastCursorPos = pt;
+		m_mouseState.hasLeftBeenDragged = true;
 	}
 
 	return 0;
@@ -414,17 +414,17 @@ LRESULT CMainWindow::onMouseWheel(WPARAM wParam, LPARAM lParam)
 {
 	short usDelta = static_cast<short>(HIWORD(wParam));
 	int iScroll = -usDelta / WHEEL_DELTA;
-	WORD usKey = LOWORD(wParam);
 
-	if (usKey == MK_LBUTTON)
+	WORD pressedKeys = LOWORD(wParam);
+	if (pressedKeys == MK_LBUTTON)
 	{
 
 	}
-	else if (usKey == MK_RBUTTON)
+	else if (pressedKeys == MK_RBUTTON)
 	{
 		shiftScene(iScroll > 0);
 
-		m_wasRightCombinated = true;
+		m_mouseState.wasRightCombined = true;
 	}
 	else
 	{
@@ -436,73 +436,76 @@ LRESULT CMainWindow::onMouseWheel(WPARAM wParam, LPARAM lParam)
 /*WM_LBUTTONDOWN*/
 LRESULT CMainWindow::onLButtonDown(WPARAM wParam, LPARAM lParam)
 {
-	::GetCursorPos(&m_lastCursorPos);
+	::GetCursorPos(&m_mouseState.lastCursorPos);
 
-	m_wasLeftPressed = true;
+	m_mouseState.wasLeftPressed = true;
 
 	return 0;
 }
 /*WM_LBUTTONUP*/
 LRESULT CMainWindow::onLButtonUp(WPARAM wParam, LPARAM lParam)
 {
-	if (m_hasLeftBeenDragged)
+	if (m_mouseState.hasLeftBeenDragged)
 	{
-		m_hasLeftBeenDragged = false;
-		m_wasLeftPressed = false;
+		m_mouseState.hasLeftBeenDragged = false;
+		m_mouseState.wasLeftPressed = false;
 
 		return 0;
 	}
 
-	WORD usKey = LOWORD(wParam);
-
-	if (usKey == MK_RBUTTON && m_isFramelessWindow)
+	WORD pressedKeys = LOWORD(wParam);
+	if (pressedKeys == MK_RBUTTON)
 	{
-		::PostMessage(m_hWnd, WM_SYSCOMMAND, SC_MOVE, 0);
-		INPUT input{};
-		input.type = INPUT_KEYBOARD;
-		input.ki.wVk = VK_DOWN;
-		::SendInput(1, &input, sizeof(input));
-
-		m_wasRightCombinated = true;
-	}
-
-	if (usKey == 0 && m_wasLeftPressed)
-	{
-		POINT pt{};
-		::GetCursorPos(&pt);
-		int iX = m_lastCursorPos.x - pt.x;
-		int iY = m_lastCursorPos.y - pt.y;
-
-		if (iX == 0 && iY == 0)
+		if (m_windowStyle.isFrameless)
 		{
-			if (m_videoTransferor.isPaused())
+			::PostMessage(m_hWnd, WM_SYSCOMMAND, SC_MOVE, 0);
+			INPUT input{};
+			input.type = INPUT_KEYBOARD;
+			input.ki.wVk = VK_DOWN;
+			::SendInput(1, &input, sizeof(input));
+
+			m_mouseState.wasRightCombined = true;
+		}
+	}
+	else if (pressedKeys == 0)
+	{
+		if (m_mouseState.wasLeftPressed)
+		{
+			POINT pt{};
+			::GetCursorPos(&pt);
+			int iDeltaX = m_mouseState.lastCursorPos.x - pt.x;
+			int iDeltaY = m_mouseState.lastCursorPos.y - pt.y;
+
+			if (iDeltaX == 0 && iDeltaY == 0)
 			{
-				m_videoTransferor.frameStep(true);
-			}
-			else
-			{
-				shiftPaintData();
+				if (m_videoTransferor.isPaused())
+				{
+					m_videoTransferor.frameStep(true);
+				}
+				else
+				{
+					shiftPaintData();
+				}
 			}
 		}
 	}
 
-	m_wasLeftPressed = false;
+	m_mouseState.wasLeftPressed = false;
 
 	return 0;
 }
 /*WM_RBUTTONUP*/
 LRESULT CMainWindow::onRButtonUp(WPARAM wParam, LPARAM lParam)
 {
-	if (m_wasRightCombinated)
+	if (m_mouseState.wasRightCombined)
 	{
-		m_wasRightCombinated = false;
+		m_mouseState.wasRightCombined = false;
 
 		return 0;
 	}
 
-	WORD usKey = LOWORD(wParam);
-
-	if (usKey == 0)
+	WORD pressedKeys = LOWORD(wParam);
+	if (pressedKeys == 0)
 	{
 		if (isPlayReady() && !m_labelData.empty())
 		{
@@ -533,17 +536,16 @@ LRESULT CMainWindow::onRButtonUp(WPARAM wParam, LPARAM lParam)
 /*WM_MBUTTONUP*/
 LRESULT CMainWindow::onMButtonUp(WPARAM wParam, LPARAM lParam)
 {
-	WORD usKey = LOWORD(wParam);
-	if (usKey == 0)
+	WORD pressedKeys = LOWORD(wParam);
+	if (pressedKeys == 0)
 	{
 		m_viewManager.resetScale();
 	}
-
-	if (usKey == MK_RBUTTON)
+	else if (pressedKeys == MK_RBUTTON)
 	{
 		toggleWindowFrameStyle();
 
-		m_wasRightCombinated = true;
+		m_mouseState.wasRightCombined = true;
 	}
 
 	return 0;
@@ -649,10 +651,10 @@ void CMainWindow::menuOnPauseVideo()
 }
 void CMainWindow::menuOnSyncImage()
 {
-	bool bRet = window_menu::SetMenuCheckState(window_menu::GetMenuInBar(m_hWnd, MenuBar::kImage), Menu::kSyncImage, !m_isImageSynced);
+	bool bRet = window_menu::SetMenuCheckState(window_menu::GetMenuInBar(m_hWnd, MenuBar::kImage), Menu::kSyncImage, !m_sceneState.isImageSynced);
 	if (bRet)
 	{
-		m_isImageSynced ^= true;
+		m_sceneState.isImageSynced ^= true;
 		updatePaintData();
 	}
 }
@@ -679,15 +681,23 @@ void CMainWindow::toggleWindowFrameStyle()
 
 	LONG lStyle = ::GetWindowLong(m_hWnd, GWL_STYLE);
 
-	m_isFramelessWindow ^= true;
-
-	if (m_isFramelessWindow)
+	m_windowStyle.isFrameless ^= true;
+	if (m_windowStyle.isFrameless)
 	{
+		MONITORINFO monitorInfo{ sizeof(MONITORINFO) };
+		HMONITOR hMonitor = ::MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
+		if (hMonitor != nullptr)
+		{
+			/* Nothing can be done even if failed. */
+			::GetMonitorInfoW(hMonitor, &monitorInfo);
+		}
+
 		RECT rect;
 		::GetWindowRect(m_hWnd, &rect);
 
 		::SetWindowLong(m_hWnd, GWL_STYLE, lStyle & ~WS_CAPTION & ~WS_SYSMENU);
-		::SetWindowPos(m_hWnd, nullptr, 0, 0, rect.right - rect.left, rect.bottom - rect.top, SWP_NOZORDER);
+		/* If GetMonitorInfoW failed, rcMonitor.left and rcMonitor.top remains zero, namely the origin of primary monitor. */
+		::SetWindowPos(m_hWnd, nullptr, monitorInfo.rcMonitor.left, monitorInfo.rcMonitor.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOZORDER);
 		::SetMenu(m_hWnd, nullptr);
 	}
 	else
@@ -750,7 +760,9 @@ void CMainWindow::clearScenarioData()
 	m_videoTimer.end();
 	clearStoeredVideoFrame();
 
-	m_hasFirstPaintDataBeenLoaded = false;
+	m_sceneState.hasFirstPaintDataBeenLoaded = false;
+
+	m_formattedText.clear();
 }
 /*再描画要求*/
 void CMainWindow::updateScreen() const noexcept
@@ -765,7 +777,7 @@ bool CMainWindow::isPlayReady() const noexcept
 /*表示図画送り・戻し*/
 void CMainWindow::shiftPaintData()
 {
-	if (!m_isImageSynced)
+	if (!m_sceneState.isImageSynced)
 	{
 		++m_nPaintIndex;
 		if (m_nPaintIndex >= m_paintData.size())m_nPaintIndex = 0;
@@ -864,7 +876,7 @@ const adv::PaintDatum* CMainWindow::getCurrentPaintData()
 {
 	if (m_nSceneIndex < m_sceneData.size())
 	{
-		if (m_isImageSynced)
+		if (m_sceneState.isImageSynced)
 		{
 			m_nPaintIndex = m_sceneData[m_nSceneIndex].nPaintIndex;
 		}
@@ -921,13 +933,13 @@ void CMainWindow::createImageMap()
 					HRESULT hr = pD2d1DeviceContext->CreateBitmapFromWicBitmap(pWicBitmap, D2D1::BitmapProperties(D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE)), &pD2d1Bitmap);
 					if (SUCCEEDED(hr))
 					{
-						if (!m_hasFirstPaintDataBeenLoaded)
+						if (!m_sceneState.hasFirstPaintDataBeenLoaded)
 						{
 							const D2D1_SIZE_F& size = pD2d1Bitmap->GetSize();
 							m_viewManager.setBaseSize(m_hWnd, static_cast<unsigned int>(size.width), static_cast<unsigned int>(size.height));
 							m_viewManager.resetScale();
 
-							m_hasFirstPaintDataBeenLoaded = true;
+							m_sceneState.hasFirstPaintDataBeenLoaded = true;
 						}
 
 						m_imageMap.insert({ paintDatum.wstrFilePath, std::move(pD2d1Bitmap) });
@@ -963,7 +975,7 @@ void CMainWindow::onVideoPlayerEvent(unsigned long ulEvent, DWORD_PTR param1)
 	switch (ulEvent)
 	{
 	case MF_MEDIA_ENGINE_EVENT_LOADEDMETADATA:
-		if (!m_hasFirstPaintDataBeenLoaded)
+		if (!m_sceneState.hasFirstPaintDataBeenLoaded)
 		{
 			unsigned long ulWidth = 0;
 			unsigned long ulHeight = 0;
@@ -973,7 +985,7 @@ void CMainWindow::onVideoPlayerEvent(unsigned long ulEvent, DWORD_PTR param1)
 				m_viewManager.setBaseSize(m_hWnd, ulWidth, ulHeight);
 				m_viewManager.resetScale();
 
-				m_hasFirstPaintDataBeenLoaded = true;
+				m_sceneState.hasFirstPaintDataBeenLoaded = true;
 			}
 		}
 		break;

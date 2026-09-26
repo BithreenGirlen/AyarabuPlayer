@@ -63,13 +63,22 @@ private:
 	struct EventMessage { enum { kAudioPlayer = WM_USER + 1, kVideoPlayer }; };
 	struct Timer { enum { kText = 1}; };
 
-	POINT m_lastCursorPos{};
-	bool m_wasLeftPressed = false;
-	bool m_hasLeftBeenDragged = false;
-	bool m_wasRightCombinated = false;
+	struct MouseState
+	{
+		bool wasLeftPressed = false;
+		bool hasLeftBeenDragged = false;
+		bool wasRightCombined = false;
+		POINT lastCursorPos{};
+	};
+
+	struct WindowStyle
+	{
+		bool isFrameless = false;
+	};
 
 	HMENU m_hMenuBar = nullptr;
-	bool m_isFramelessWindow = false;
+	MouseState m_mouseState;
+	WindowStyle m_windowStyle;
 
 	std::vector<std::wstring> m_scriptFilePaths;
 	size_t m_nScriptFilePathIndex = 0;
@@ -102,19 +111,26 @@ private:
 	CViewManager m_viewManager;
 
 	std::vector<adv::TextDatum> m_textData;
-
 	std::vector<adv::PaintDatum> m_paintData;
 	size_t m_nPaintIndex = 0;
 	size_t m_nLastVideoIndex = 0;
-
 	std::vector<adv::SceneDatum> m_sceneData;
 	size_t m_nSceneIndex = 0;
-
 	std::vector<adv::LabelDatum> m_labelData;
 
-	bool m_hasFirstPaintDataBeenLoaded = false;
-	bool m_isTextHidden = false;
-	bool m_isImageSynced = true;
+	struct SceneState
+	{
+		bool hasFirstPaintDataBeenLoaded = false;
+		bool isTextHidden = false;
+		bool isImageSynced = true;
+	};
+
+	SceneState m_sceneState;
+
+	CWinTimer m_videoTimer;
+	std::map<long long, CComPtr<ID2D1Bitmap>> m_storedVideoFrames;
+	std::map<std::wstring, CComPtr<ID2D1Bitmap>> m_imageMap;
+	std::wstring m_formattedText;
 
 	bool isPlayReady() const noexcept;
 
@@ -128,11 +144,6 @@ private:
 	void autoTexting();
 
 	const adv::PaintDatum* getCurrentPaintData();
-
-	CWinTimer m_videoTimer;
-	std::map<long long, CComPtr<ID2D1Bitmap>> m_storedVideoFrames;
-	std::map<std::wstring, CComPtr<ID2D1Bitmap>> m_imageMap;
-	std::wstring m_formattedText;
 
 	void storeVideoFrame(long long llCurrentTime, CComPtr<ID2D1Bitmap> pD2D1Bitmap);
 	void clearStoeredVideoFrame();
