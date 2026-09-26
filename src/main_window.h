@@ -93,7 +93,7 @@ private:
 	bool setupScenario(const wchar_t* scriptFilePath);
 	void clearScenarioData();
 
-	void updateScreen() const;
+	void updateScreen() const noexcept;
 
 	CD2ImageDrawer* m_pD2ImageDrawer = nullptr;
 	CD2TextWriter* m_pD2TextWriter = nullptr;
@@ -116,7 +116,7 @@ private:
 	bool m_isTextHidden = false;
 	bool m_isImageSynced = true;
 
-	bool isPlayReady() const;
+	bool isPlayReady() const noexcept;
 
 	void shiftPaintData();
 	void updatePaintData();
@@ -128,21 +128,21 @@ private:
 	void autoTexting();
 
 	const adv::PaintDatum* getCurrentPaintData();
-	std::wstring formatCurrentText();
 
+	CWinTimer m_videoTimer;
 	std::map<long long, CComPtr<ID2D1Bitmap>> m_storedVideoFrames;
+	std::map<std::wstring, CComPtr<ID2D1Bitmap>> m_imageMap;
+	std::wstring m_formattedText;
+
 	void storeVideoFrame(long long llCurrentTime, CComPtr<ID2D1Bitmap> pD2D1Bitmap);
 	void clearStoeredVideoFrame();
 	ID2D1Bitmap* restoreVideoFrame(long long llCurrentTime);
 
-	std::map<std::wstring, CComPtr<ID2D1Bitmap>> m_imageMap;
 	void createImageMap();
 	void clearImageMap();
 
 	void onAudioPlayerEvent(unsigned long ulEvent, DWORD_PTR param1);
 	void onVideoPlayerEvent(unsigned long ulEvent, DWORD_PTR param1);
-
-	CWinTimer m_videoTimer;
 };
 
 #endif //MAIN_WINDOW_H_
