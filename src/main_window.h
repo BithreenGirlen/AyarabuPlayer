@@ -22,7 +22,7 @@ public:
 	CMainWindow();
 	~CMainWindow();
 
-	bool Create(HINSTANCE hInstance);
+	bool create(HINSTANCE hInstance);
 	int messageLoop();
 
 	HWND getHwnd()const noexcept { return m_hWnd;}
@@ -95,11 +95,11 @@ private:
 	void menuOnPauseVideo();
 	void menuOnSyncImage();
 
-	void changeWindowTitle(const wchar_t* pzTitle);
+	void changeWindowTitle(const wchar_t* pwzWindowTitle);
 	void toggleWindowFrameStyle();
 	void updateMenuItemState() const;
 
-	bool setupScenario(const wchar_t* scriptFilePath);
+	bool setupScenario(const std::wstring& scriptFilePath);
 	void clearScenarioData();
 
 	void updateScreen() const noexcept;

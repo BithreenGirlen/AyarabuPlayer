@@ -23,7 +23,7 @@ CMainWindow::~CMainWindow()
 
 }
 
-bool CMainWindow::Create(HINSTANCE hInstance)
+bool CMainWindow::create(HINSTANCE hInstance)
 {
 	WNDCLASSEXW wcex{};
 
@@ -597,15 +597,16 @@ void CMainWindow::initialiseMenuBar()
 /*ファイル選択*/
 void CMainWindow::menuOnOpenFile()
 {
-	std::wstring wstrPickedFile = win_dialogue::SelectOpenFile(L"script file", L"*3.evsc*", nullptr, m_hWnd);
-	if (!wstrPickedFile.empty())
+	static constexpr wchar_t s_fileFilter[] = L"*3.evsc*";
+	std::wstring selectedFilePath = win_dialogue::SelectOpenFile(L"script file", s_fileFilter, nullptr, m_hWnd);
+	if (!selectedFilePath.empty())
 	{
-		bool bRet = setupScenario(wstrPickedFile.c_str());
+		bool bRet = setupScenario(selectedFilePath);
 		if (bRet)
 		{
 			m_scriptFilePaths.clear();
 			m_nScriptFilePathIndex = 0;
-			win_filesystem::GetFilePathListAndIndex(wstrPickedFile, L"*3.evsc*", m_scriptFilePaths, &m_nScriptFilePathIndex);
+			win_filesystem::GetFilePathListAndIndex(selectedFilePath, s_fileFilter, m_scriptFilePaths, &m_nScriptFilePathIndex);
 		}
 	}
 }
@@ -616,7 +617,7 @@ void CMainWindow::menuOnNextFile()
 
 	++m_nScriptFilePathIndex;
 	if (m_nScriptFilePathIndex >= m_scriptFilePaths.size())m_nScriptFilePathIndex = 0;
-	setupScenario(m_scriptFilePaths[m_nScriptFilePathIndex].c_str());
+	setupScenario(m_scriptFilePaths[m_nScriptFilePathIndex]);
 }
 /*前ファイルに移動*/
 void CMainWindow::menuOnForeFile()
@@ -625,7 +626,7 @@ void CMainWindow::menuOnForeFile()
 
 	--m_nScriptFilePathIndex;
 	if (m_nScriptFilePathIndex >= m_scriptFilePaths.size())m_nScriptFilePathIndex = m_scriptFilePaths.size() - 1;
-	setupScenario(m_scriptFilePaths[m_nScriptFilePathIndex].c_str());
+	setupScenario(m_scriptFilePaths[m_nScriptFilePathIndex]);
 }
 /*音声設定画面呼び出し*/
 void CMainWindow::menuOnAudioSetting()
@@ -659,20 +660,20 @@ void CMainWindow::menuOnSyncImage()
 	}
 }
 /*標題変更*/
-void CMainWindow::changeWindowTitle(const wchar_t* pzTitle)
+void CMainWindow::changeWindowTitle(const wchar_t* pwzWindowTitle)
 {
-	const wchar_t* windowTitle = pzTitle;
-	if (windowTitle != nullptr)
+	const wchar_t* pTruncatedWindowTitle = pwzWindowTitle;
+	if (pTruncatedWindowTitle != nullptr)
 	{
 		for (;;)
 		{
-			const wchar_t* pPos = wcspbrk(windowTitle, L"\\/");
+			const wchar_t* pPos = wcspbrk(pTruncatedWindowTitle, L"\\/");
 			if (pPos == nullptr)break;
-			windowTitle = pPos + 1;
+			pTruncatedWindowTitle = pPos + 1;
 		}
 	}
 
-	::SetWindowTextW(m_hWnd, windowTitle == nullptr ? m_swzDefaultWindowName : windowTitle);
+	::SetWindowTextW(m_hWnd, pTruncatedWindowTitle == nullptr ? m_swzDefaultWindowName : pTruncatedWindowTitle);
 }
 /*表示形式変更*/
 void CMainWindow::toggleWindowFrameStyle()
@@ -717,15 +718,13 @@ void CMainWindow::updateMenuItemState() const
 	window_menu::EnableMenuItems(window_menu::GetMenuInBar(m_hWnd, MenuBar::kFile), fileMenuIndices, toEnable);
 }
 /*寸劇構築*/
-bool CMainWindow::setupScenario(const wchar_t* scriptFilePath)
+bool CMainWindow::setupScenario(const std::wstring& scriptFilePath)
 {
-	if (scriptFilePath == nullptr)return false;
-
 	clearScenarioData();
 
-	bool hadBeenReady = isPlayReady();
-	bool bRet = ayarabu::LoadScenario(scriptFilePath, m_textData, m_paintData, m_sceneData, m_labelData);
-	if (!bRet)
+	const bool hadBeenReady = isPlayReady();
+	const bool isReady = ayarabu::LoadScenario(scriptFilePath, m_textData, m_paintData, m_sceneData, m_labelData);
+	if (!isReady)
 	{
 		::MessageBoxW(m_hWnd, L"Failed to load scenario.", L"Error", MB_ICONERROR);
 	}
@@ -736,10 +735,10 @@ bool CMainWindow::setupScenario(const wchar_t* scriptFilePath)
 		updatePaintData();
 	}
 
-	changeWindowTitle(bRet ? scriptFilePath : nullptr);
-	if(hadBeenReady != bRet) updateMenuItemState();
+	changeWindowTitle(isReady ? scriptFilePath.c_str() : nullptr);
+	if(hadBeenReady != isReady) updateMenuItemState();
 
-	return bRet;
+	return isReady;
 }
 /*寸劇情報消去*/
 void CMainWindow::clearScenarioData()
