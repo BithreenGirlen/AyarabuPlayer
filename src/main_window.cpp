@@ -263,9 +263,15 @@ LRESULT CMainWindow::onPaint()
 
 	if (bRet)
 	{
-		if (!m_sceneState.isTextHidden && m_pD2TextWriter != nullptr)
+		if (!m_sceneState.isTextHidden)
 		{
-			m_pD2TextWriter->outLinedDraw(m_formattedText.c_str(), static_cast<unsigned long>(m_formattedText.size()));
+			RECT rc;
+			::GetClientRect(m_hWnd, &rc);
+
+			const float targetWidth = static_cast<float>(rc.right - rc.left);
+			const float fontThickness = m_pD2TextWriter->getThickness();
+
+			m_pD2TextWriter->outLinedDraw(m_formattedText.c_str(), static_cast<unsigned long>(m_formattedText.size()), targetWidth, { fontThickness , fontThickness });
 		}
 		m_pD2ImageDrawer->display();
 	}
@@ -350,6 +356,9 @@ LRESULT CMainWindow::onCommand(WPARAM wParam, LPARAM lParam)
 			break;
 		case Menu::kVideoSetting:
 			menuOnVideoSetting();
+			break;
+		case Menu::kFontSetting:
+			menuOnFontSetting();
 			break;
 		case Menu::kPauseVideo:
 			menuOnPauseVideo();
@@ -568,7 +577,8 @@ void CMainWindow::initialiseMenuBar()
 			{0, L"Setting", window_menu::MenuBuilder(
 				{
 					{Menu::kAudioSetting, L"Audio"},
-					{Menu::kVideoSetting, L"Video"}
+					{Menu::kVideoSetting, L"Video"},
+					{Menu::kFontSetting, L"Font"}
 				}).get()
 			},
 			{0, L"Image", window_menu::MenuBuilder(
@@ -639,6 +649,19 @@ void CMainWindow::menuOnVideoSetting()
 {
 	CMediaSettingDialogue mediaSettingDialogue;
 	mediaSettingDialogue.open(m_hInstance, m_hWnd, &m_videoTransferor, L"Video");
+}
+
+void CMainWindow::menuOnFontSetting()
+{
+	if (m_fontSettingDiallogue.getHwnd() == nullptr)
+	{
+		HWND hWnd = m_fontSettingDiallogue.open(m_hInstance, m_hWnd, L"Font", m_pD2TextWriter);
+		::ShowWindow(hWnd, SW_SHOWNORMAL);
+	}
+	else
+	{
+		::SetFocus(m_fontSettingDiallogue.getHwnd());
+	}
 }
 /*動画一時停止*/
 void CMainWindow::menuOnPauseVideo()

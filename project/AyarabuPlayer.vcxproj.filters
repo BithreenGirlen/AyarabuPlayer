@@ -75,6 +75,18 @@
     <ClInclude Include="..\src\native-ui\media_setting_dialogue.h">
       <Filter>Header Files\native-ui</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\native-ui\dialogue_controls.h">
+      <Filter>Header Files\native-ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\native-ui\dialogue_template.h">
+      <Filter>Header Files\native-ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\native-ui\font_setting_dialogue.h">
+      <Filter>Header Files\native-ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\win_font.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\d2_image_drawer.cpp">
@@ -127,6 +139,18 @@
     </ClCompile>
     <ClCompile Include="..\src\native-ui\media_setting_dialogue.cpp">
       <Filter>Source Files\native-ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\native-ui\dialogue_controls.cpp">
+      <Filter>Source Files\native-ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\native-ui\dialogue_template.cpp">
+      <Filter>Source Files\native-ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\native-ui\font_setting_dialogue.cpp">
+      <Filter>Source Files\native-ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\win_font.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

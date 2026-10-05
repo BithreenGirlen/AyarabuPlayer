@@ -16,6 +16,8 @@
 #include "adv.h"
 #include "win_timer.h"
 
+#include "native-ui/font_setting_dialogue.h"
+
 class CMainWindow
 {
 public:
@@ -55,8 +57,8 @@ private:
 		enum
 		{
 			kOpenFile = 1, kNextFile, kForeFile,
-			kAudioSetting, kVideoSetting,
-			kPauseVideo, kTickVideo, kSyncImage
+			kAudioSetting, kVideoSetting, kFontSetting,
+			kPauseVideo, kSyncImage
 		};
 	};
 	struct MenuBar { enum { kFile, kSetting, kImage }; };
@@ -91,6 +93,7 @@ private:
 
 	void menuOnAudioSetting();
 	void menuOnVideoSetting();
+	void menuOnFontSetting();
 
 	void menuOnPauseVideo();
 	void menuOnSyncImage();
@@ -109,6 +112,8 @@ private:
 	CMfMediaPlayer m_audioPlayer;
 	CMfVideoTransferor m_videoTransferor;
 	CViewManager m_viewManager;
+
+	CFontSettingDialogue m_fontSettingDiallogue;
 
 	std::vector<adv::TextDatum> m_textData;
 	std::vector<adv::PaintDatum> m_paintData;
