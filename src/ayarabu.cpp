@@ -6,10 +6,14 @@
 #include "win_text.h"
 #include "text_utility.h"
 #include "json_minimal.h"
+#include "static_string.h"
 
 /* 内部用 */
 namespace ayarabu
 {
+	static constexpr const size_t kMaxFilePathLength = 1024;
+	using StaticWSringMaxPath = StaticString<wchar_t, kMaxFilePathLength>;
+
 	/* 
 	* Usually, naming convention for enum class is PascalCase,
 	* but here MACRO_CASE is adopted for the nature of the scripts.
@@ -104,9 +108,9 @@ namespace ayarabu
 
 	/* "voiceFormatId", "directoryPath", "assetBundleName", "assetDataName" */
 	static std::vector<std::vector<std::string>> g_voiceFormatData;
-	static std::wstring g_wstrStillFolderPath;
-	static std::wstring g_wstrVideoFolderPath;
-	static std::wstring g_wstrVoiceFolderPath;
+	static StaticWSringMaxPath g_stillFolderPath;
+	static StaticWSringMaxPath g_videoFolderPath;
+	static StaticWSringMaxPath g_voiceFolderPath;
 
 	static unsigned long ToUInt32(const char* src)
 	{
@@ -188,47 +192,47 @@ namespace ayarabu
 			{
 			case EAdvUserInstructionNo::READ_MESSAGE:
 			case EAdvUserInstructionNo::VOICE_START:
-			if(c.args.size() > 4)
-			{
-				/*
-				* [0] 話者名開始位置,
-				* [1] 台詞もしくは地の文開始位置,
-				* [2] 23固定,
-				* [3] 0固定,
-				* [4] 音声ファイルID; 割り当て無しの場合0,
-				*/
-				MessageDatum s;
-
-				uint32_t nStart = ulTextOffset + c.args[0].value;
-				if (nStart >= nTextEndPos)continue;
-
-				size_t nPos = scriptFile.find('\0', nStart);
-				if (nPos == std::string::npos)continue;
-
-				size_t nLength = nPos - nStart;
-				if (nLength)
+				if (c.args.size() > 4)
 				{
-					s.wstrName = win_text::WidenUtf8(&scriptFile[nStart], static_cast<int>(nLength));
+					/*
+					* [0] 話者名開始位置,
+					* [1] 台詞もしくは地の文開始位置,
+					* [2] 23固定,
+					* [3] 0固定,
+					* [4] 音声ファイルID; 割り当て無しの場合0,
+					*/
+					MessageDatum s;
+
+					uint32_t nStart = ulTextOffset + c.args[0].value;
+					if (nStart >= nTextEndPos)continue;
+
+					size_t nPos = scriptFile.find('\0', nStart);
+					if (nPos == std::string::npos)continue;
+
+					size_t nLength = nPos - nStart;
+					if (nLength)
+					{
+						s.wstrName = win_text::WidenUtf8(&scriptFile[nStart], static_cast<int>(nLength));
+					}
+
+					nStart = ulTextOffset + c.args[1].value;
+					if (nStart >= nTextEndPos)continue;
+
+					nPos = scriptFile.find('\0', nStart);
+					if (nPos == std::string::npos)continue;
+
+					nLength = nPos - nStart;
+					if (nLength)
+					{
+						s.wstrText = win_text::WidenUtf8(&scriptFile[nStart], static_cast<int>(nLength));
+					}
+
+					s.voiceId = c.args[4].value;
+
+					messageData.push_back(std::move(s));
+
+					scriptCommands.emplace_back(ScriptCommand{ ECommandType::Message, messageData.size() - 1 });
 				}
-
-				nStart = ulTextOffset + c.args[1].value;
-				if (nStart >= nTextEndPos)continue;
-
-				nPos = scriptFile.find('\0', nStart);
-				if (nPos == std::string::npos)continue;
-
-				nLength = nPos - nStart;
-				if (nLength)
-				{
-					s.wstrText = win_text::WidenUtf8(&scriptFile[nStart], static_cast<int>(nLength));
-				}
-
-				s.voiceId = c.args[4].value;
-
-				messageData.push_back(std::move(s));
-
-				scriptCommands.emplace_back(ScriptCommand{ ECommandType::Message, messageData.size() - 1 });
-			}
 				break;
 			case EAdvUserInstructionNo::MOVIE_PLAY:
 				if (c.args.size() > 1)
@@ -253,12 +257,12 @@ namespace ayarabu
 		}
 	}
 	/* 音声ファイル名称書式表構築 */
-	static void SetupVoiceFileNameFormatData(const std::wstring& wstrFilePath, std::vector<std::vector<std::string>>& formatTable)
+	static void SetupVoiceFileNameFormatData(const std::wstring& tableFilePath, std::vector<std::vector<std::string>>& formatTable)
 	{
-		const std::string strFile = win_filesystem::LoadFileAsString(wstrFilePath.c_str());
-		if (strFile.empty())return;
+		std::string tableFile = win_filesystem::LoadFileAsString(tableFilePath.c_str());
+		if (tableFile.empty())return;
 
-		const char* p = &strFile[0];
+		const char* p = &tableFile[0];
 		const char* pStart = nullptr, * pEnd = nullptr;
 		/*
 		* Actually, masterData is not JSON, but partially can be regarded as JSON
@@ -321,67 +325,75 @@ namespace ayarabu
 		return scriptFilePath.substr(0, nPos).append(LR"(mock\master_data\sound\SoundVoiceFormatMasterDatas.any)");
 	}
 	/* 脚本ファイル経路から各種資源階層導出 */
-	static bool DeriveResourceFolderPathsFromScriptFilePath(const std::wstring& wstrFilePath)
+	static bool DeriveResourceFolderPathsFromScriptFilePath(const std::wstring& scriptFilePath)
 	{
-		size_t nAdvPos = wstrFilePath.rfind(L"adventure");
+		size_t nAdvPos = scriptFilePath.rfind(L"adventure");
 		if (nAdvPos == std::wstring::npos)return false;
 
-		size_t nEventDataPos = wstrFilePath.rfind(L"eventdata\\eventdata");
+		size_t nEventDataPos = scriptFilePath.rfind(L"eventdata\\eventdata");
 		if (nEventDataPos == std::wstring::npos)return false;
 
-		g_wstrStillFolderPath.assign(&wstrFilePath[0], nEventDataPos).append(LR"(advstill)");
+		g_stillFolderPath.assign(&scriptFilePath[0], nEventDataPos).append(LR"(advstill)");
+		g_videoFolderPath.assign(&scriptFilePath[0], nAdvPos).append(LR"(movie\harem)");
+		g_voiceFolderPath.assign(&scriptFilePath[0], nAdvPos).append(LR"(sound\voice)");
 
-		g_wstrVideoFolderPath.assign(&wstrFilePath[0], nAdvPos).append(LR"(movie\harem)");
-		g_wstrVoiceFolderPath.assign(&wstrFilePath[0], nAdvPos).append(LR"(sound\voice)");
-
-		return !g_wstrStillFolderPath.empty() && !g_wstrVideoFolderPath.empty() && !g_wstrVoiceFolderPath.empty();
+		return !g_stillFolderPath.empty() && !g_videoFolderPath.empty() && !g_voiceFolderPath.empty();
 	}
+
 	/* 基底ID=>書式ID */
-	static char* BaseIdToFormatId(unsigned long baseId, int* nLength)
+	template<size_t N>
+	static bool BaseIdToFormatId(unsigned long baseId, char(&dst)[N], int& nLength)
 	{
-		static char s_szFormatIdBuffer[32]{};
-		int iWritten = sprintf_s(s_szFormatIdBuffer, "%d10001", baseId);
-		if (iWritten == -1)return nullptr;
+		int nWritten = ::sprintf_s(dst, "%d10001", baseId);
+		if (nWritten == -1)return false;
 
-		if (nLength != nullptr)
-		{
-			*nLength = iWritten;
-		}
+		nLength = nWritten;
 
-		return s_szFormatIdBuffer;
+		return true;
 	}
+
 	/* 基底ID=>静画・動画ID */
-	static std::wstring BaseIdToStillOrVideoId(unsigned long baseId)
+	template<size_t N>
+	static bool BaseIdToStillOrVideoId(unsigned long baseId, wchar_t(&dst)[N], int& nLength)
 	{
-		wchar_t swzBuffer[5]{};
-		swprintf_s(swzBuffer, L"%04lu", baseId);
-		return swzBuffer;
-	}
-	/* 脚本ファイル名から基底ID抽出 */
-	static unsigned long ExtractIdFromScriptFileName(const std::wstring& wstrFilePath)
-	{
-		constexpr wchar_t swzStart[] = L"eventdata";
-		constexpr size_t startLength = sizeof(swzStart) / sizeof(wchar_t) - 1;
-		constexpr wchar_t swzEnd[] = L"03.evsc";
+		int nWritten = ::swprintf_s(dst, L"%04lu", baseId);
+		if (nWritten == -1)return false;
 
-		size_t nPos1 = wstrFilePath.rfind(swzStart);
-		size_t nPos2 = wstrFilePath.rfind(swzEnd);
+		nLength = nWritten;
+
+		return true;
+	}
+
+	/* 脚本ファイル名から基底ID抽出 */
+	static unsigned long ExtractIdFromScriptFileName(const std::wstring& scriptFilePath)
+	{
+		constexpr wchar_t scriptFileIdentifier[] = L"eventdata";
+		constexpr size_t startLength = sizeof(scriptFileIdentifier) / sizeof(wchar_t) - 1;
+		constexpr wchar_t interestingIdentifier[] = L"03.evsc";
+
+		size_t nPos1 = scriptFilePath.rfind(scriptFileIdentifier);
+		size_t nPos2 = scriptFilePath.rfind(interestingIdentifier);
 		if (nPos1 == std::wstring::npos || nPos2 == std::wstring::npos)return -1;
 
 		nPos1 += startLength;
 
-		std::wstring wstrId = wstrFilePath.substr(nPos1, nPos2 - nPos1);
-		unsigned long baseId = wcstoul(wstrId.c_str(), nullptr, 10);
+		const size_t nLength = nPos2 - nPos1;
+		StaticString<wchar_t, 32> idBuffer;
+		if (nLength > idBuffer.capacity())return -1;
+		idBuffer.assign(&scriptFilePath[nPos1], nLength);
+
+		unsigned long baseId = ::wcstoul(idBuffer.data(), nullptr, 10);
+
 		return baseId;
 	}
 	/* 音声ファイル探索 */
 	static size_t FindVoiceFiles(unsigned long baseId, std::vector<std::wstring>& voiceFilePaths)
 	{
+		char formatIdBuffer[32]{};
 		int nFormatIdLength = 0;
-		char* pszFormatId = BaseIdToFormatId(baseId, &nFormatIdLength);
-		if (pszFormatId == nullptr)return 0;
+		if (!BaseIdToFormatId(baseId, formatIdBuffer, nFormatIdLength))return 0;
 
-		const std::string* pUtf8VoiceDirectoryFormat = FindVoiceDirectoryFormat(pszFormatId, nFormatIdLength);
+		const std::string* pUtf8VoiceDirectoryFormat = FindVoiceDirectoryFormat(formatIdBuffer, nFormatIdLength);
 		if (pUtf8VoiceDirectoryFormat == nullptr || pUtf8VoiceDirectoryFormat->empty())return 0;
 
 		size_t nFormatPos = pUtf8VoiceDirectoryFormat->find("{1}");
@@ -394,7 +406,7 @@ namespace ayarabu
 
 		wchar_t utf16VoiceFolderPathBuffer[512]{};
 		int nVoiceFolderPathBufferLength = swprintf_s(utf16VoiceFolderPathBuffer, L"%.*s\\%.*s3",
-			static_cast<int>(g_wstrVoiceFolderPath.size()), g_wstrVoiceFolderPath.data(),
+			static_cast<int>(g_voiceFolderPath.size()), g_voiceFolderPath.data(),
 			nDirectoryFormatLength, utf16DirectoryFormatBuffer
 		);
 		if (nVoiceFolderPathBufferLength < 1)return 0;
@@ -426,16 +438,16 @@ bool ayarabu::LoadScenario(const std::wstring& scriptFilePath, std::vector<adv::
 	/* 初期作成 */
 	if (g_voiceFormatData.empty())
 	{
-		std::wstring wstrVoiceMasterDataFilePath = DeriveSoundMasterDataPathFromScriptFilePath(scriptFilePath);
-		if (wstrVoiceMasterDataFilePath.empty())return false;
+		std::wstring voiceMasterDataFilePath = DeriveSoundMasterDataPathFromScriptFilePath(scriptFilePath);
+		if (voiceMasterDataFilePath.empty())return false;
 
-		SetupVoiceFileNameFormatData(wstrVoiceMasterDataFilePath, g_voiceFormatData);
+		SetupVoiceFileNameFormatData(voiceMasterDataFilePath, g_voiceFormatData);
 		if (g_voiceFormatData.empty())return false;
 
 		if (!DeriveResourceFolderPathsFromScriptFilePath(scriptFilePath))return false;
 	}
 
-	uint32_t baseId = ExtractIdFromScriptFileName(scriptFilePath);
+	const uint32_t baseId = ExtractIdFromScriptFileName(scriptFilePath);
 	if (baseId == static_cast<uint32_t>(-1L)) return false;
 
 	std::string scriptFile = win_filesystem::LoadFileAsString(scriptFilePath.c_str());
@@ -466,26 +478,28 @@ bool ayarabu::LoadScenario(const std::wstring& scriptFilePath, std::vector<adv::
 			return -1;
 		};
 
-	long long nEpisode4StartIndex = FindEpisode4StartIndex();
+	const long long nEpisode4StartIndex = FindEpisode4StartIndex();
 	if (nEpisode4StartIndex == -1)return false;
 
 	/* 音声ファイル探索 */
 
 	std::vector<std::wstring> voiceFilePaths;
-	size_t nIntroVoiceFileCount = FindVoiceFiles(baseId, voiceFilePaths);
+	const size_t nIntroVoiceFileCount = FindVoiceFiles(baseId, voiceFilePaths);
 
 	/* 静画・動画ファイル探索 */
+	wchar_t imageIdBuffer[32]{};
+	int imageIdBufferLength = 0;
+	if (!BaseIdToStillOrVideoId(baseId, imageIdBuffer, imageIdBufferLength))return false;
 
-	std::wstring wstrImageId = BaseIdToStillOrVideoId(baseId);
+	StaticWSringMaxPath folderPathBuffer;
 
 	std::vector<std::wstring> stillIFilePaths;
-	std::wstring wstrFolderPath = g_wstrStillFolderPath;
-	wstrFolderPath.append(L"\\advstill").append(wstrImageId);
-	win_filesystem::CreateFilePathList(wstrFolderPath, L".png", stillIFilePaths);
+	folderPathBuffer.assign(g_stillFolderPath).append(L"\\advstill").append(imageIdBuffer, imageIdBufferLength);
+	win_filesystem::CreateFilePathList(folderPathBuffer.data(), folderPathBuffer.size(), L".png", stillIFilePaths);
 
 	std::vector<std::wstring> videoFilePaths;
-	wstrFolderPath.assign(g_wstrVideoFolderPath).append(L"\\chara").append(wstrImageId);
-	win_filesystem::CreateFilePathList(wstrFolderPath, L".mp4", videoFilePaths);
+	folderPathBuffer.assign(g_videoFolderPath).append(L"\\chara").append(imageIdBuffer, imageIdBufferLength);
+	win_filesystem::CreateFilePathList(folderPathBuffer.data(), folderPathBuffer.size(), L".mp4", videoFilePaths);
 
 	std::wstring labelCaptionBuffer;
 	size_t nLastPaintIndex = 0;
@@ -504,7 +518,7 @@ bool ayarabu::LoadScenario(const std::wstring& scriptFilePath, std::vector<adv::
 				adv::TextDatum textDatum;
 				if (!messageDatum.wstrName.empty())
 				{
-					textDatum.wstrText = messageDatum.wstrName;
+					textDatum.wstrText.assign(messageDatum.wstrName);
 					textDatum.wstrText += L':';
 				}
 				textDatum.wstrText += L" \n";
