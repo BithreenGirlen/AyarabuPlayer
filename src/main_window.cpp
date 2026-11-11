@@ -330,6 +330,10 @@ LRESULT CMainWindow::onKeyUp(WPARAM wParam, LPARAM lParam)
 			updateScreen();
 		}
 		break;
+	case 'F':
+		m_windowStyle.toFitToMonitorHeight ^= true;
+		resetWindowScale();
+		break;
 	case 'T':
 		m_sceneState.isTextHidden ^= true;
 		updateScreen();
@@ -553,7 +557,7 @@ LRESULT CMainWindow::onMButtonUp(WPARAM wParam, LPARAM lParam)
 	WORD pressedKeys = LOWORD(wParam);
 	if (pressedKeys == 0)
 	{
-		m_viewManager.resetScale();
+		resetWindowScale();
 	}
 	else if (pressedKeys == MK_RBUTTON)
 	{
@@ -688,9 +692,9 @@ void CMainWindow::menuOnSyncImage()
 	}
 }
 /*標題変更*/
-void CMainWindow::changeWindowTitle(const wchar_t* pwzWindowTitle)
+void CMainWindow::changeWindowTitle(const wchar_t* windowTitle)
 {
-	const wchar_t* pTruncatedWindowTitle = pwzWindowTitle;
+	const wchar_t* pTruncatedWindowTitle = windowTitle;
 	if (pTruncatedWindowTitle != nullptr)
 	{
 		for (;;)
@@ -736,6 +740,36 @@ void CMainWindow::toggleWindowFrameStyle()
 	}
 
 	m_viewManager.onStyleChanged();
+}
+
+void CMainWindow::resetWindowScale()
+{
+	if (!m_windowStyle.isFrameless)
+	{
+		m_viewManager.resetScale();
+	}
+	else
+	{
+		MONITORINFO monitorInfo{ sizeof(MONITORINFO) };
+		HMONITOR hMonitor = ::MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
+		if (hMonitor != nullptr)
+		{
+			::GetMonitorInfoW(hMonitor, &monitorInfo);
+		}
+		::SetWindowPos(m_hWnd, nullptr, monitorInfo.rcMonitor.left, monitorInfo.rcMonitor.top, 0, 0, SWP_NOSIZE);
+
+		const unsigned int baseWidth = m_viewManager.getBaseWidth();
+		const unsigned int baseHeight = m_viewManager.getBaseHeight();
+
+		const unsigned int monitorwidth = static_cast<unsigned int>(monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left);
+		const unsigned int monitorHeight = static_cast<unsigned int>(monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top);
+
+		const bool isLandscape = monitorwidth > monitorHeight;
+		const bool toFitToWidth = isLandscape ^ m_windowStyle.toFitToMonitorHeight;
+		const float scale = static_cast<float>((toFitToWidth ? monitorwidth : monitorHeight)) / (toFitToWidth ? baseWidth : baseHeight);
+
+		m_viewManager.resetScale(scale);
+	}
 }
 
 void CMainWindow::updateMenuItemState() const
@@ -964,7 +998,7 @@ void CMainWindow::createImageMap()
 						{
 							const D2D1_SIZE_F& size = pD2d1Bitmap->GetSize();
 							m_viewManager.setBaseSize(m_hWnd, static_cast<unsigned int>(size.width), static_cast<unsigned int>(size.height));
-							m_viewManager.resetScale();
+							resetWindowScale();
 
 							m_sceneState.hasFirstPaintDataBeenLoaded = true;
 						}
@@ -1010,7 +1044,7 @@ void CMainWindow::onVideoPlayerEvent(unsigned long ulEvent, DWORD_PTR param1)
 			if (bRet)
 			{
 				m_viewManager.setBaseSize(m_hWnd, ulWidth, ulHeight);
-				m_viewManager.resetScale();
+				resetWindowScale();
 
 				m_sceneState.hasFirstPaintDataBeenLoaded = true;
 			}

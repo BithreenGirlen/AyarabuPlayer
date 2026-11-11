@@ -76,6 +76,7 @@ private:
 	struct WindowStyle
 	{
 		bool isFrameless = false;
+		bool toFitToMonitorHeight = false;
 	};
 
 	HMENU m_hMenuBar = nullptr;
@@ -98,8 +99,10 @@ private:
 	void menuOnPauseVideo();
 	void menuOnSyncImage();
 
-	void changeWindowTitle(const wchar_t* pwzWindowTitle);
+	void changeWindowTitle(const wchar_t* windowTitle);
 	void toggleWindowFrameStyle();
+	void resetWindowScale();
+
 	void updateMenuItemState() const;
 
 	bool setupScenario(const std::wstring& scriptFilePath);
