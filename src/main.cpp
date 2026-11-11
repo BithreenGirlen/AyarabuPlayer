@@ -22,11 +22,20 @@
 
 #pragma comment (lib, "Shcore.lib")
 
+struct ComInit
+{
+	HRESULT m_hrComInit;
+	ComInit() : m_hrComInit(::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE)) {}
+	~ComInit() { if (SUCCEEDED(m_hrComInit)) ::CoUninitialize(); }
+};
+
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_opt_ HINSTANCE hPrevInstance,
 	_In_ LPWSTR    lpCmdLine,
 	_In_ int       nCmdShow)
 {
+	ComInit comInit;
+
 	::SetProcessDpiAwareness(PROCESS_SYSTEM_DPI_AWARE);
 
 	int iRet = 0;

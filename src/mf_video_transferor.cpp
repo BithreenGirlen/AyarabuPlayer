@@ -6,10 +6,6 @@
 
 #pragma comment (lib,"Windowscodecs.lib")
 
-CMfVideoTransferor::CMfVideoTransferor()
-{
-
-}
 
 CMfVideoTransferor::~CMfVideoTransferor()
 {
@@ -79,16 +75,16 @@ bool CMfVideoTransferor::transferVideoFrame(ID2D1DeviceContext* const pD2d1Devic
 	return false;
 }
 
-bool CMfVideoTransferor::setPlaybackWindow(HWND hWnd, UINT uMsg)
+bool CMfVideoTransferor::setPlaybackWindow(HWND hWnd, UINT uMsg) noexcept
 {
-	m_hRetWnd = hWnd;
-	m_uRetMsg = uMsg;
+	m_hPlaybackHwnd = hWnd;
+	m_uPlaybackMsg = uMsg;
 
 	HRESULT hr = m_pMfAttributes->SetUINT32(MF_MEDIA_ENGINE_VIDEO_OUTPUT_FORMAT, DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM);
 	return SUCCEEDED(hr);
 }
 
-bool CMfVideoTransferor::resizeBuffer()
+bool CMfVideoTransferor::resizeBuffer() noexcept
 {
 	/*rendering mode only*/
 	return false;

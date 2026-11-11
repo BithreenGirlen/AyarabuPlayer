@@ -9,9 +9,6 @@
 
 CD2ImageDrawer::CD2ImageDrawer(HWND hWnd)
 {
-	m_hrComInit = ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-	if (FAILED(m_hrComInit))return;
-
 	CComPtr<ID3D11Device>pD3d11Device;
 	HRESULT hr = ::D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
 		D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_SINGLETHREADED, nullptr, 0, D3D11_SDK_VERSION,
@@ -86,11 +83,6 @@ CD2ImageDrawer::~CD2ImageDrawer()
 	{
 		m_pD2d1Factory1->Release();
 		m_pD2d1Factory1 = nullptr;
-	}
-
-	if (SUCCEEDED(m_hrComInit))
-	{
-		::CoUninitialize();
 	}
 }
 
@@ -182,14 +174,12 @@ bool CD2ImageDrawer::checkBufferSize()
 			RECT rc;
 			::GetClientRect(hWnd, &rc);
 
-			unsigned int clientWidth = rc.right - rc.left;
-			unsigned int clientHeight = rc.bottom - rc.top;
+			UINT clientWidth = rc.right - rc.left;
+			UINT clientHeight = rc.bottom - rc.top;
 
 			if (m_bufferWidth != clientWidth || m_bufferHeight != clientHeight)
 			{
-				m_bufferWidth = clientWidth;
-				m_bufferHeight = clientHeight;
-				return resizeBuffer();
+				return resizeBuffer(clientWidth, clientHeight);
 			}
 			else
 			{
@@ -201,21 +191,28 @@ bool CD2ImageDrawer::checkBufferSize()
 	return false;
 }
 
-bool CD2ImageDrawer::resizeBuffer()
+bool CD2ImageDrawer::resizeBuffer(UINT width, UINT height)
 {
 	if (m_pDxgiSwapChain1 != nullptr && m_pD2d1DeviceContext != nullptr)
 	{
 		m_pD2d1DeviceContext->SetTarget(nullptr);
 
-		HRESULT hr = m_pDxgiSwapChain1->ResizeBuffers(0, m_bufferWidth, m_bufferHeight, DXGI_FORMAT_B8G8R8A8_UNORM, 0);
+		HRESULT hr = m_pDxgiSwapChain1->ResizeBuffers(0, width, height, DXGI_FORMAT_B8G8R8A8_UNORM, 0);
+		if (FAILED(hr))return false;
+		
+		m_bufferWidth = width;
+		m_bufferHeight = height;
 
 		CComPtr<IDXGISurface> pDxgiSurface;
 		hr = m_pDxgiSwapChain1->GetBuffer(0, IID_PPV_ARGS(&pDxgiSurface));
+		if (FAILED(hr))return false;
 
 		CComPtr<ID2D1Bitmap1> pD2d1Bitmap1;
 		hr = m_pD2d1DeviceContext->CreateBitmapFromDxgiSurface(pDxgiSurface, nullptr, &pD2d1Bitmap1);
+		if (FAILED(hr))return false;
 
 		m_pD2d1DeviceContext->SetTarget(pD2d1Bitmap1);
+
 		return SUCCEEDED(hr);
 	}
 

@@ -13,7 +13,7 @@ public:
 	CD2ImageDrawer(HWND hWnd);
 	~CD2ImageDrawer();
 
-	void clear(const D2D1::ColorF& colour = D2D1::ColorF(255, 255, 255, 255));
+	void clear(const D2D1::ColorF& colour = D2D1::ColorF(1.f, 1.f, 1.f, 1.f));
 #ifdef _DEBUG
 	/// @brief Draw BGRA32 image 
 	bool drawCpuImage(const void* srcData, const UINT32 width, const UINT32 height, const UINT32 stride, const D2D1_POINT_2F& targetOffset = {}, const D2D_VECTOR_2F& sourceOffset = {}, float fScale = 1.f);
@@ -28,16 +28,15 @@ public:
 	ID2D1Factory1* const getD2Factory()const { return m_pD2d1Factory1; }
 	ID2D1DeviceContext* const getD2DeviceContext()const { return m_pD2d1DeviceContext; }
 private:
-	HRESULT m_hrComInit = E_FAIL;
 	ID2D1Factory1* m_pD2d1Factory1 = nullptr;
 	ID2D1DeviceContext* m_pD2d1DeviceContext = nullptr;
 	IDXGISwapChain1* m_pDxgiSwapChain1 = nullptr;
 
-	unsigned int m_bufferWidth = 0;
-	unsigned int m_bufferHeight = 0;
+	UINT m_bufferWidth = 0;
+	UINT m_bufferHeight = 0;
 
 	bool checkBufferSize();
-	bool resizeBuffer();
+	bool resizeBuffer(UINT width, UINT height);
 #ifdef _DEBUG
 	ID2D1Bitmap* m_pCpuImageBuffer = nullptr;
 

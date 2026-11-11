@@ -57,43 +57,42 @@ public:
 	CMfMediaPlayer();
 	virtual ~CMfMediaPlayer();
 
-	bool play(const wchar_t* filePath);
+	bool play(const wchar_t* filePath) noexcept;
 
-	bool setLoop(bool looped);
-	bool isLooped();
+	bool setLoop(bool looped) noexcept;
+	bool isLooped() const noexcept;
 
-	bool setMute(bool muted);
-	bool isMuted();
+	bool setMute(bool muted) noexcept;
+	bool isMuted() const noexcept;
 
-	bool setPause(bool paused);
-	bool isPaused();
+	bool setPause(bool paused) noexcept;
+	bool isPaused() const noexcept;
 
-	bool isEnded();
+	bool isEnded() const noexcept;
 
 	/// @brief Step one frame forward/backward
-	bool frameStep(bool forward);
+	bool frameStep(bool forward) noexcept;
 
-	bool setCurrentVolume(double dbVolume);
-	double getCurrentVolume();
+	bool setCurrentVolume(double dbVolume) noexcept;
+	double getCurrentVolume() const noexcept;
 
-	bool setCurrentRate(double dbRate);
-	double getCurrentRate();
+	bool setCurrentRate(double dbRate) noexcept;
+	double getCurrentRate() const noexcept;
 
-	long long getCurrentTimeInMilliSeconds();
+	long long getCurrentTimeInMilliSeconds() const noexcept;
 
 	/// @brief Set window and message code to receive event notification.
-	virtual bool setPlaybackWindow(HWND hWnd, UINT uMsg = 0);
-	bool getVideoSize(DWORD* dwWidth, DWORD* dwHeight);
-	void setDisplayArea(const RECT absoluteRect);
-	virtual bool resizeBuffer();
+	virtual bool setPlaybackWindow(HWND hWnd, UINT uMsg = 0) noexcept;
+	bool getVideoSize(DWORD* dwWidth, DWORD* dwHeight) const noexcept;
+	void setDisplayArea(const RECT absoluteRect) noexcept;
+	virtual bool resizeBuffer() noexcept;
 
-	HWND getRetHwnd()const { return m_hRetWnd; }
-	UINT getRetMsg() const { return m_uRetMsg; }
+	HWND getPlaybackHwnd()const noexcept;
+	UINT getPlaybackWindowMessage() const noexcept;
 protected:
-	HWND m_hRetWnd = nullptr;
-	UINT m_uRetMsg = 0;
+	HWND m_hPlaybackHwnd = nullptr;
+	UINT m_uPlaybackMsg = 0;
 
-	HRESULT m_hrComInit = E_FAIL;
 	HRESULT m_hrMfStart = E_FAIL;
 
 	CMfMediaPlayerNotify* m_pMfNotify = nullptr;
@@ -102,7 +101,7 @@ protected:
 
 	MFVideoNormalizedRect m_normalisedRect{};
 
-	void workOutNormalisedRect(const RECT absoluteRect, MFVideoNormalizedRect* normalisedRect);
+	void workOutNormalisedRect(const RECT absoluteRect, MFVideoNormalizedRect* normalisedRect) noexcept;
 };
 
 #endif // !MF_MEDIA_PLAYER_H_

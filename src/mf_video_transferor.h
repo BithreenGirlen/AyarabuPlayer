@@ -21,7 +21,7 @@
 class CMfVideoTransferor : public CMfMediaPlayer
 {
 public:
-	CMfVideoTransferor();
+	CMfVideoTransferor() = default;
 	~CMfVideoTransferor();
 
 	struct SVideoFrame
@@ -37,8 +37,8 @@ public:
 	/// @brief Transfer as GPU resource
 	bool transferVideoFrame(ID2D1DeviceContext* const pD2d1DeviceContext, ID2D1Bitmap** pD2d1Bitmap, long long *currentFrameTime);
 
-	bool setPlaybackWindow(HWND hWnd, UINT uMsg) override;
-	bool resizeBuffer() override;
+	bool setPlaybackWindow(HWND hWnd, UINT uMsg) noexcept override;
+	bool resizeBuffer() noexcept override;
 private:
 	IWICBitmap *m_pWicBitmap = nullptr;
 

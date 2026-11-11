@@ -4,19 +4,9 @@
 
 #include "win_dialogue.h"
 
-namespace win_dialogue
-{
-	struct ComInit
-	{
-		HRESULT m_hrComInit;
-		ComInit() : m_hrComInit(::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE)) {}
-		~ComInit() { if (SUCCEEDED(m_hrComInit)) ::CoUninitialize(); }
-	};
-}
 
 std::wstring win_dialogue::SelectFolder(const wchar_t* title, void* hOwnerWnd)
 {
-	ComInit comInit;
 	CComPtr<IFileOpenDialog> pFolderDialog;
 	HRESULT hr = pFolderDialog.CoCreateInstance(CLSID_FileOpenDialog);
 
@@ -50,7 +40,6 @@ std::wstring win_dialogue::SelectFolder(const wchar_t* title, void* hOwnerWnd)
 
 std::wstring win_dialogue::SelectOpenFile(const wchar_t* fileType, const wchar_t* fileSpec, const wchar_t* title, void* hOwnerWnd, bool allowAll)
 {
-	ComInit comInit;
 	CComPtr<IFileOpenDialog> pFileDialog;
 	HRESULT hr = pFileDialog.CoCreateInstance(CLSID_FileOpenDialog);
 
@@ -93,7 +82,6 @@ std::wstring win_dialogue::SelectOpenFile(const wchar_t* fileType, const wchar_t
 
 std::wstring win_dialogue::SelectSaveFile(const wchar_t* fileType, const wchar_t* fileSpec, const wchar_t* defaultFileName, void* hOwnerWnd)
 {
-	ComInit comInit;
 	CComPtr<IFileSaveDialog> pFileDialog;
 	HRESULT hr = pFileDialog.CoCreateInstance(CLSID_FileSaveDialog);
 
