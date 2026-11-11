@@ -308,7 +308,7 @@ namespace ayarabu
 		{
 			if (voiceFormatDatum.size() > 1 
 				&& voiceFormatDatum[0].size() == nformatIdLength
-				&& (::memcmp(&voiceFormatDatum[0], formarId, nformatIdLength) == 0))
+				&& (::memcmp(voiceFormatDatum[0].data(), formarId, nformatIdLength) == 0))
 			{
 				return &voiceFormatDatum[1];
 			}
