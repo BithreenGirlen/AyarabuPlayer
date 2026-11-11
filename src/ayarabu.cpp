@@ -10,6 +10,77 @@
 /* 内部用 */
 namespace ayarabu
 {
+	/* 
+	* Usually, naming convention for enum class is PascalCase,
+	* but here MACRO_CASE is adopted for the nature of the scripts.
+	*/
+	enum class EAdvUserInstructionNo
+	{
+		NOP = 30,
+		READ_MESSAGE,
+		WAIT_WORK,
+		OPEN_EPISODE,
+		CLOSE_EPISODE,
+		CHARA_DELETE,
+		CHARA_DISP_REGISTRATION,
+		CHARA_ACTION_JUMP,
+		FILE_PRELOAD,
+		CHARA_MOVE,
+		DISP_EXECUTION,
+		CHARA_OUT,
+		CHARA_SLIDE,
+		WHITE_IN,
+		WHITE_OUT,
+		BLACK_IN,
+		BLACK_OUT,
+		SHAKE,
+		CAMERA_ZOOM_RESET,
+		CAMERA_ZOOM,
+		SE_STOP,
+		SE_START,
+		BGM_STOP,
+		BGM_START,
+		BG_DISP,
+		BRANCH_DISP,
+		BRANCH_RESULT,
+		MESSAGE_WINDOW_DISP_SWITCH,
+		EMOTION_SWITCH,
+		MOVIE_PLAY,
+		TALK_BRIGHTNESS,
+		COLOR_IN_H,
+		COLOR_OUT_H,
+		FILE_LOAD,
+		CHARA_EFFECT_ANIMATION,
+		STOP_MOVIE,
+		CHARA_MASK,
+		BLACK_FRAME_ON,
+		BLACK_FRAME_OFF,
+		DARK_EFFECT_ON,
+		DARK_EFFECT_OFF,
+		STILL_DELETE,
+		STILL_DISP_REGISTRATION,
+		STILL_OUT,
+		SUSPEND,
+		EFFECT_ANIMATION_STOP,
+		EFFECT_ANIMATION_DELETE,
+		GRAY_SCALE,
+		VOICE_STOP,
+		VOICE_START,
+		MESSAGE_WINDOW_TYPE,
+		MESSAGE_WINDOW_TYPE_RESET,
+		ALTER_KOMAGEKI,
+		ALTER_CHANGE_CHARA_ATTACHMENT,
+		MOVIE_PAUSE,
+		MOVIE_RESUME,
+		CHARA_FACE_PATTERN,
+		EFFECT_ANIMATION_COORDINATE,
+		PREFAB_PLAY,
+		PREFAB_STOP,
+		COLOR_IN,
+		COLOR_OUT,
+		COUNT_MAX
+	};
+
 	enum class ECommandType
 	{
 		Unknown = -1,
@@ -46,7 +117,6 @@ namespace ayarabu
 	/* 脚本ファイル読み取り */
 	static void ReadScript(
 		const std::string& scriptFile,
-		const uint32_t baseId,
 		std::vector<MessageDatum>& messageData,
 		std::vector<ScriptCommand>& scriptCommands)
 	{
@@ -113,19 +183,12 @@ namespace ayarabu
 
 		for (const auto& c : commandData)
 		{
-			const auto IsMessageCommand = [&c]()
-				{
-					return c.args.size() > 4 && c.args[0].type == 3 && c.args[1].type == 3;
-				};
-			const auto IsStillCommand = [&c, &baseId]()
-				{
-					return c.args.size() == 4 && c.args[1].value == baseId;
-				};
-			const auto IsVideoCommand = [&c, &baseId]()
-				{
-					return c.args.size() == 2 && c.args[1].value != 0 && c.args[0].value == baseId;
-				};
-			if (IsMessageCommand())
+			const EAdvUserInstructionNo type = static_cast<EAdvUserInstructionNo>(c.datum.params.param1);
+			switch (type)
+			{
+			case EAdvUserInstructionNo::READ_MESSAGE:
+			case EAdvUserInstructionNo::VOICE_START:
+			if(c.args.size() > 4)
 			{
 				/*
 				* [0] 話者名開始位置,
@@ -166,13 +229,20 @@ namespace ayarabu
 
 				scriptCommands.emplace_back(ScriptCommand{ ECommandType::Message, messageData.size() - 1 });
 			}
-			else if (IsStillCommand())
-			{
-				scriptCommands.emplace_back(ScriptCommand{ ECommandType::Still, c.args[2].value });
-			}
-			else if (IsVideoCommand())
-			{
-				scriptCommands.emplace_back(ScriptCommand{ ECommandType::Video, c.args[1].value });
+				break;
+			case EAdvUserInstructionNo::MOVIE_PLAY:
+				if (c.args.size() > 1)
+				{
+					scriptCommands.emplace_back(ScriptCommand{ ECommandType::Video, c.args[1].value });
+				}
+			case EAdvUserInstructionNo::STILL_DISP_REGISTRATION:
+				if (c.args.size() > 2)
+				{
+					scriptCommands.emplace_back(ScriptCommand{ ECommandType::Still, c.args[2].value });
+				}
+				break;
+			default:
+				break;
 			}
 		}
 
@@ -375,7 +445,7 @@ bool ayarabu::LoadScenario(const std::wstring& scriptFilePath, std::vector<adv::
 
 	std::vector<MessageDatum> messageData;
 	std::vector<ScriptCommand> scriptCommands;
-	ReadScript(scriptFile, baseId, messageData, scriptCommands);
+	ReadScript(scriptFile, messageData, scriptCommands);
 	if (scriptCommands.empty())return false;
 
 	const auto FindEpisode4StartIndex = [&scriptCommands]()
