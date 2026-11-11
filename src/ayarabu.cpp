@@ -384,7 +384,8 @@ bool ayarabu::LoadScenario(const std::wstring& scriptFilePath, std::vector<adv::
 			const auto& iter = std::find_if(scriptCommands.cbegin(), scriptCommands.cend(),
 				[](const ScriptCommand& scriptCommand)
 				{
-					return scriptCommand.commandType == ECommandType::Still;
+					/* The scene of "0048503" does not start with still, but with movie. */
+					return scriptCommand.commandType == ECommandType::Still || scriptCommand.commandType == ECommandType::Video;
 				});
 
 			if (iter != scriptCommands.cend())

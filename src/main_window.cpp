@@ -770,7 +770,7 @@ void CMainWindow::clearScenarioData()
 
 	m_paintData.clear();
 	m_nPaintIndex = 0;
-	m_nLastVideoIndex = 0;
+	m_nLastVideoIndex = static_cast<size_t>(-1LL);
 
 	m_sceneData.clear();
 	m_nSceneIndex = 0;
@@ -830,7 +830,7 @@ void CMainWindow::updatePaintData()
 	}
 	else
 	{
-		m_nLastVideoIndex = 0;
+		m_nLastVideoIndex = static_cast<size_t>(-1LL);
 		clearStoeredVideoFrame();
 		m_videoTimer.end();
 	}

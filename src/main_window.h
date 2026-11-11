@@ -118,7 +118,7 @@ private:
 	std::vector<adv::TextDatum> m_textData;
 	std::vector<adv::PaintDatum> m_paintData;
 	size_t m_nPaintIndex = 0;
-	size_t m_nLastVideoIndex = 0;
+	size_t m_nLastVideoIndex = static_cast<size_t>(-1LL);
 	std::vector<adv::SceneDatum> m_sceneData;
 	size_t m_nSceneIndex = 0;
 	std::vector<adv::LabelDatum> m_labelData;
