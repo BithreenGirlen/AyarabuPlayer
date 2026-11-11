@@ -19,7 +19,7 @@ assetbundledatas
   │  │  ├ ...
   │  │  ├ sound
   │  │  │  ├ ...
-  │  │  │  └ SoundVoiceMasterDatas.any // Voice file format table
+  │  │  │  └ SoundVoiceFormatMasterDatas.any // Voice file format table
   │  │  └ ...
   │  └ user_data
   ├ ...
@@ -71,8 +71,8 @@ r18/adventure/eventdata
 | File | Open | Show a dialogue to select a script file to open. |
 | - | Next | Open the next script. |
 | - | Previous | Open the previous script. |
-| Setting | Audio | Show a dialogue for audio player volume/playback rate. |
-| - | Video | Show a dialogue for video player playback rate. |
+| Setting | Audio | Show a dialogue for voice volume/playback rate. |
+| - | Video | Show a dialogue for video playback rate. |
 | Image | Pause | Pause video. |
 | - | Sync | Turn on/off the synchronisation of still/videos with texts. |
 
@@ -83,11 +83,11 @@ r18/adventure/eventdata
 
 | Input | Action |
 | --- | --- |
-| Mouse wheel | Scale up/down |
+| Wheel scroll | Scale up/down |
 | Left drag | Move the region to be shown. This works only when scaled beyond the display resolution. |
 | Middle click | Reset the scale to the default. |
 | Right click | Show context menu to jump to the scene where still/video is switched. |
-| Right pressed + mouse wheel | Fast-forward/rewind text. |
+| Right pressed + wheel scroll | Fast-forward/rewind text. |
 | Right pressed + middle click | Hide/show window's border. Having hidden, the window goes to the origin of the primary display. |
 | Right pressed + left click | Move borderless window. |
 
@@ -97,6 +97,7 @@ r18/adventure/eventdata
 | --- | --- |
 | <kbd>Esc</kbd> | Close the application. |
 | <kbd>C</kbd> | Toggle the text colour between black and white. |
+| <kbd>F</kbd> | Fit window to the width or height of monitor. Valid only when the window is borderless. |
 | <kbd>T</kbd> | Show/hide the text. |
 | <kbd>↑</kbd> | Open the previous script. |
 | <kbd>↓</kbd> | Open the next script. |
