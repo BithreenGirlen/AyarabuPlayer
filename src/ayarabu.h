@@ -9,7 +9,7 @@
 namespace ayarabu
 {
 	bool LoadScenario(
-		const std::wstring& wstrFilePath,
+		const std::wstring& scriptFilePath,
 		std::vector<adv::TextDatum>& textData,
 		std::vector<adv::PaintDatum>& paintData,
 		std::vector<adv::SceneDatum>& sceneData,

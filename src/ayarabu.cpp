@@ -39,43 +39,33 @@ namespace ayarabu
 
 	static unsigned long ToUInt32(const char* src)
 	{
-		unsigned long ul = 0;
-		const unsigned char* p = reinterpret_cast<const unsigned char*>(src);
-		ul = p[3];
-		ul <<= 8;
-		ul |= p[2];
-		ul <<= 8;
-		ul |= p[1];
-		ul <<= 8;
-		ul |= p[0];
-		return ul;
+		const uint8_t* p = reinterpret_cast<const uint8_t*>(src);
+		return p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24);
 	}
 
 	/* 脚本ファイル読み取り */
 	static void ReadScript(
-		const std::wstring& wstrFilePath,
+		const std::string& scriptFile,
 		const uint32_t baseId,
 		std::vector<MessageDatum>& messageData,
 		std::vector<ScriptCommand>& scriptCommands)
 	{
-		std::string strFile = win_filesystem::LoadFileAsString(wstrFilePath.c_str());
+		static constexpr size_t kCommandOffsetAddress = 0x08;
+		static constexpr size_t kCommandCountAddress = 0x0c;
+		static constexpr size_t kTextOffsetAddress = 0x10;
+		static constexpr size_t kTextLengthAddress = 0x14;
 
-		static constexpr size_t kCommandOffset = 0x08;
-		static constexpr size_t kCommandCount = 0x0c;
-		static constexpr size_t kTextOffset = 0x10;
-		static constexpr size_t kTextLength = 0x14;
+		if (scriptFile.size() < kTextLengthAddress + 4ULL)return;
 
-		if (strFile.size() < kTextLength + 4ULL)return;
+		const uint32_t ulCommandOffset = ToUInt32(&scriptFile[kCommandOffsetAddress]);
+		const uint32_t ulCommandCount = ToUInt32(&scriptFile[kCommandCountAddress]);
+		const uint32_t ulTextOffset = ToUInt32(&scriptFile[kTextOffsetAddress]);
+		const uint32_t ulTextLength = ToUInt32(&scriptFile[kTextLengthAddress]);
 
-		uint32_t ulCommandPos = ToUInt32(&strFile[kCommandOffset]);
-		uint32_t ulCommandCount = ToUInt32(&strFile[kCommandCount]);
-		uint32_t ulTextPos = ToUInt32(&strFile[kTextOffset]);
-		uint32_t ulTextLength = ToUInt32(&strFile[kTextLength]);
-
-		size_t nTextEndPos = static_cast<size_t>(ulTextPos + ulTextLength);
-		if (strFile.size() < nTextEndPos)return;
-		size_t nCommandEndPos = ulCommandPos + (ulCommandCount * 8ULL);
-		if (strFile.size() < nCommandEndPos)return;
+		const size_t nTextEndPos = static_cast<size_t>(ulTextOffset + ulTextLength);
+		if (scriptFile.size() < nTextEndPos)return;
+		const size_t nCommandEndPos = ulCommandOffset + (ulCommandCount * 8ULL);
+		if (scriptFile.size() < nCommandEndPos)return;
 
 		struct CommandArg
 		{
@@ -100,11 +90,11 @@ namespace ayarabu
 			std::vector<CommandArg> args;
 		};
 		std::vector<CommandDatum> commandData;
-		for (size_t nRead = ulCommandPos; nRead < nCommandEndPos;)
+		for (size_t nRead = ulCommandOffset; nRead < nCommandEndPos;)
 		{
 			CommandDatum c;
-			c.type = strFile[nRead];
-			c.datum.value = ToUInt32(&strFile[nRead + 4]);
+			c.type = scriptFile[nRead];
+			c.datum.value = ToUInt32(&scriptFile[nRead + 4]);
 			nRead += 8ULL;
 
 			if (c.type == 0)
@@ -112,8 +102,8 @@ namespace ayarabu
 				c.args.resize(c.datum.params.param2);
 				for (uint16_t i = 0; i < c.datum.params.param2; ++i)
 				{
-					c.args[i].type = strFile[nRead];
-					c.args[i].value = ToUInt32(&strFile[nRead + 4]);
+					c.args[i].type = scriptFile[nRead];
+					c.args[i].value = ToUInt32(&scriptFile[nRead + 4]);
 					nRead += 8ULL;
 				}
 			}
@@ -146,28 +136,28 @@ namespace ayarabu
 				*/
 				MessageDatum s;
 
-				uint32_t nStart = ulTextPos + c.args[0].value;
+				uint32_t nStart = ulTextOffset + c.args[0].value;
 				if (nStart >= nTextEndPos)continue;
 
-				size_t nPos = strFile.find('\0', nStart);
+				size_t nPos = scriptFile.find('\0', nStart);
 				if (nPos == std::string::npos)continue;
 
 				size_t nLength = nPos - nStart;
 				if (nLength)
 				{
-					s.wstrName = win_text::WidenUtf8(&strFile[nStart], static_cast<int>(nLength));
+					s.wstrName = win_text::WidenUtf8(&scriptFile[nStart], static_cast<int>(nLength));
 				}
 
-				nStart = ulTextPos + c.args[1].value;
+				nStart = ulTextOffset + c.args[1].value;
 				if (nStart >= nTextEndPos)continue;
 
-				nPos = strFile.find('\0', nStart);
+				nPos = scriptFile.find('\0', nStart);
 				if (nPos == std::string::npos)continue;
 
 				nLength = nPos - nStart;
 				if (nLength)
 				{
-					s.wstrText = win_text::WidenUtf8(&strFile[nStart], static_cast<int>(nLength));
+					s.wstrText = win_text::WidenUtf8(&scriptFile[nStart], static_cast<int>(nLength));
 				}
 
 				s.voiceId = c.args[4].value;
@@ -237,26 +227,28 @@ namespace ayarabu
 
 		formatTable = std::move(formatData);
 	}
-	/* 音声ファイル名称書式探索 */
-	static const std::string FindVoiceFileFormat(const std::string& strKey)
+	/* 音声ファイル階層書式探索 */
+	static const std::string* FindVoiceDirectoryFormat(const char* formarId, size_t nformatIdLength)
 	{
 		for (const auto& voiceFormatDatum : g_voiceFormatData)
 		{
-			if (voiceFormatDatum.size() > 1 && voiceFormatDatum[0] == strKey)
+			if (voiceFormatDatum.size() > 1 
+				&& voiceFormatDatum[0].size() == nformatIdLength
+				&& (::memcmp(&voiceFormatDatum[0], formarId, nformatIdLength) == 0))
 			{
-				return voiceFormatDatum[1];
+				return &voiceFormatDatum[1];
 			}
 		}
 
-		return std::string{};
+		return nullptr;
 	}
 
-	static std::wstring DeriveSoundMasterDataPathFromScriptFilePath(const std::wstring& wstrFilePath)
+	static std::wstring DeriveSoundMasterDataPathFromScriptFilePath(const std::wstring& scriptFilePath)
 	{
-		size_t nPos = wstrFilePath.rfind(L"r18");
-		if (nPos == std::wstring::npos)return std::wstring();
+		size_t nPos = scriptFilePath.rfind(L"r18");
+		if (nPos == std::wstring::npos)return {};
 
-		return wstrFilePath.substr(0, nPos).append(LR"(mock\master_data\sound\SoundVoiceFormatMasterDatas.any)");
+		return scriptFilePath.substr(0, nPos).append(LR"(mock\master_data\sound\SoundVoiceFormatMasterDatas.any)");
 	}
 	/* 脚本ファイル経路から各種資源階層導出 */
 	static bool DeriveResourceFolderPathsFromScriptFilePath(const std::wstring& wstrFilePath)
@@ -275,9 +267,18 @@ namespace ayarabu
 		return !g_wstrStillFolderPath.empty() && !g_wstrVideoFolderPath.empty() && !g_wstrVoiceFolderPath.empty();
 	}
 	/* 基底ID=>書式ID */
-	static std::string BaseIdToFormatId(unsigned long baseId)
+	static char* BaseIdToFormatId(unsigned long baseId, int* nLength)
 	{
-		return std::to_string(baseId).append("10001");
+		static char s_szFormatIdBuffer[32]{};
+		int iWritten = sprintf_s(s_szFormatIdBuffer, "%d10001", baseId);
+		if (iWritten == -1)return nullptr;
+
+		if (nLength != nullptr)
+		{
+			*nLength = iWritten;
+		}
+
+		return s_szFormatIdBuffer;
 	}
 	/* 基底ID=>静画・動画ID */
 	static std::wstring BaseIdToStillOrVideoId(unsigned long baseId)
@@ -306,20 +307,33 @@ namespace ayarabu
 	/* 音声ファイル探索 */
 	static size_t FindVoiceFiles(unsigned long baseId, std::vector<std::wstring>& voiceFilePaths)
 	{
-		std::string strFormatId = BaseIdToFormatId(baseId);
-		const std::string& strFilePathFormat = FindVoiceFileFormat(strFormatId);
-		if (strFilePathFormat.empty())return 0;
+		int nFormatIdLength = 0;
+		char* pszFormatId = BaseIdToFormatId(baseId, &nFormatIdLength);
+		if (pszFormatId == nullptr)return 0;
 
-		size_t nFormatPos = strFilePathFormat.find("{1}");
-		if (nFormatPos == std::string::npos)nFormatPos = strFilePathFormat.size();
+		const std::string* pUtf8VoiceDirectoryFormat = FindVoiceDirectoryFormat(pszFormatId, nFormatIdLength);
+		if (pUtf8VoiceDirectoryFormat == nullptr || pUtf8VoiceDirectoryFormat->empty())return 0;
 
-		std::wstring wstrFolderPath = g_wstrVoiceFolderPath;
-		wstrFolderPath.append(L"\\").append(win_text::WidenUtf8(&strFilePathFormat[0], static_cast<int>(nFormatPos))).push_back('3');
-		win_filesystem::CreateFilePathList(wstrFolderPath, L".m4a", voiceFilePaths);
+		size_t nFormatPos = pUtf8VoiceDirectoryFormat->find("{1}");
+		if (nFormatPos == std::string::npos)nFormatPos = pUtf8VoiceDirectoryFormat->size();
 
-		size_t nIntroVoiceFileCount = voiceFilePaths.size();
-		wstrFolderPath.back() = L'4';
-		win_filesystem::CreateFilePathList(wstrFolderPath, L".m4a", voiceFilePaths);
+		wchar_t utf16DirectoryFormatBuffer[128]{};
+		static constexpr int nUtf16DirectoryFormatBufferSize = std::size(utf16DirectoryFormatBuffer);
+		int nDirectoryFormatLength = win_text::WidenUtf8InBuffer(&(*pUtf8VoiceDirectoryFormat)[0], static_cast<int>(nFormatPos), utf16DirectoryFormatBuffer, nUtf16DirectoryFormatBufferSize);
+		if (nDirectoryFormatLength == 0)return 0;
+
+		wchar_t utf16VoiceFolderPathBuffer[512]{};
+		int nVoiceFolderPathBufferLength = swprintf_s(utf16VoiceFolderPathBuffer, L"%.*s\\%.*s3",
+			static_cast<int>(g_wstrVoiceFolderPath.size()), g_wstrVoiceFolderPath.data(),
+			nDirectoryFormatLength, utf16DirectoryFormatBuffer
+		);
+		if (nVoiceFolderPathBufferLength < 1)return 0;
+
+		win_filesystem::CreateFilePathList(utf16VoiceFolderPathBuffer, static_cast<size_t>(nVoiceFolderPathBufferLength), L".m4a", voiceFilePaths);
+		const size_t nIntroVoiceFileCount = voiceFilePaths.size();
+
+		utf16VoiceFolderPathBuffer[nVoiceFolderPathBufferLength - 1ULL] = L'4';
+		win_filesystem::CreateFilePathList(utf16VoiceFolderPathBuffer, static_cast<size_t>(nVoiceFolderPathBufferLength), L".m4a", voiceFilePaths);
 
 		return nIntroVoiceFileCount;
 	}
@@ -337,28 +351,31 @@ namespace ayarabu
 	}
 } /* namespace ayarabu */
 
-bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::TextDatum>& textData, std::vector<adv::PaintDatum>& paintData, std::vector<adv::SceneDatum>& sceneData, std::vector<adv::LabelDatum>& labelData)
+bool ayarabu::LoadScenario(const std::wstring& scriptFilePath, std::vector<adv::TextDatum>& textData, std::vector<adv::PaintDatum>& paintData, std::vector<adv::SceneDatum>& sceneData, std::vector<adv::LabelDatum>& labelData)
 {
 	/* 初期作成 */
 	if (g_voiceFormatData.empty())
 	{
-		std::wstring wstrVoiceMasterDataFilePath = DeriveSoundMasterDataPathFromScriptFilePath(wstrFilePath);
+		std::wstring wstrVoiceMasterDataFilePath = DeriveSoundMasterDataPathFromScriptFilePath(scriptFilePath);
 		if (wstrVoiceMasterDataFilePath.empty())return false;
 
 		SetupVoiceFileNameFormatData(wstrVoiceMasterDataFilePath, g_voiceFormatData);
 		if (g_voiceFormatData.empty())return false;
 
-		if (!DeriveResourceFolderPathsFromScriptFilePath(wstrFilePath))return false;
+		if (!DeriveResourceFolderPathsFromScriptFilePath(scriptFilePath))return false;
 	}
 
-	uint32_t baseId = ExtractIdFromScriptFileName(wstrFilePath);
+	uint32_t baseId = ExtractIdFromScriptFileName(scriptFilePath);
 	if (baseId == static_cast<uint32_t>(-1L)) return false;
+
+	std::string scriptFile = win_filesystem::LoadFileAsString(scriptFilePath.c_str());
+	if (scriptFile.empty())return false;
 
 	/* 文章・音声・静画・動画に関する指令文の抜粋 */
 
 	std::vector<MessageDatum> messageData;
 	std::vector<ScriptCommand> scriptCommands;
-	ReadScript(wstrFilePath, baseId, messageData, scriptCommands);
+	ReadScript(scriptFile, baseId, messageData, scriptCommands);
 	if (scriptCommands.empty())return false;
 
 	const auto FindEpisode4StartIndex = [&scriptCommands]()
@@ -450,14 +467,10 @@ bool ayarabu::LoadScenario(const std::wstring& wstrFilePath, std::vector<adv::Te
 			if (fileIndex < stillIFilePaths.size())
 			{
 				/* 古い寸劇では最終動画と最終静画の間に文章が存在しない。  */
-				if (!labelCaptionBuffer.empty())
+				if (!labelCaptionBuffer.empty() && !sceneData.empty())
 				{
 					sceneData.back().nPaintIndex = nLastPaintIndex;
-
-					if (!labelCaptionBuffer.empty())
-					{
-						labelData.emplace_back(adv::LabelDatum{ std::move(labelCaptionBuffer), sceneData.size() - 1 });
-					}
+					labelData.emplace_back(adv::LabelDatum{ std::move(labelCaptionBuffer), sceneData.size() - 1 });
 				}
 
 				paintData.emplace_back(adv::PaintDatum{ false, stillIFilePaths[fileIndex] });
