@@ -106,8 +106,8 @@ void CViewManager::workOutDefaultScale()
 		BOOL iRet = ::GetMonitorInfoW(hMonitor, &monitorInfo);
 		if (iRet)
 		{
-			monitorWidth = monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left;
-			monitorHeight = monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top;
+			monitorWidth = monitorInfo.rcWork.right - monitorInfo.rcWork.left;
+			monitorHeight = monitorInfo.rcWork.bottom - monitorInfo.rcWork.top;
 		}
 	}
 	if (m_baseWidth > monitorWidth || m_baseHeight > monitorHeight)

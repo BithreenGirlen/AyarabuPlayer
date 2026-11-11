@@ -228,6 +228,11 @@ LRESULT CMainWindow::onPaint()
 	const adv::PaintDatum* pPaintDatum = getCurrentPaintData();
 	if (pPaintDatum != nullptr)
 	{
+		static const auto DrawBitmap = [this](ID2D1Bitmap* pD2d1Bitmap)
+			-> bool
+			{
+				return m_pD2ImageDrawer->scaledDraw(pD2d1Bitmap, {}, { m_viewManager.getOffsetX(), m_viewManager.getOffsetY() }, m_viewManager.getScale());
+			};
 		if (pPaintDatum->isVideo)
 		{
 			CComPtr<ID2D1Bitmap> d2d1Bitmap;
@@ -235,7 +240,7 @@ LRESULT CMainWindow::onPaint()
 			bRet = m_videoTransferor.transferVideoFrame(m_pD2ImageDrawer->getD2DeviceContext(), &d2d1Bitmap, &frameTime);
 			if (bRet)
 			{
-				bRet = m_pD2ImageDrawer->scaledDraw(d2d1Bitmap.p, {}, { m_viewManager.getOffsetX(), m_viewManager.getOffsetY() }, m_viewManager.getScale());
+				bRet = DrawBitmap(d2d1Bitmap.p);
 				if (bRet)
 				{
 					storeVideoFrame(frameTime, d2d1Bitmap);
@@ -247,7 +252,7 @@ LRESULT CMainWindow::onPaint()
 				ID2D1Bitmap* p = restoreVideoFrame(llCurrentTime);
 				if (p != nullptr)
 				{
-					bRet = m_pD2ImageDrawer->scaledDraw(p, {}, { m_viewManager.getOffsetX(), m_viewManager.getOffsetY() }, m_viewManager.getScale());
+					bRet = DrawBitmap(p);
 				}
 			}
 		}
@@ -256,7 +261,7 @@ LRESULT CMainWindow::onPaint()
 			const auto& iter = m_imageMap.find(pPaintDatum->wstrFilePath);
 			if (iter != m_imageMap.cend())
 			{
-				bRet = m_pD2ImageDrawer->scaledDraw(iter->second.p, {}, { m_viewManager.getOffsetX(), m_viewManager.getOffsetY() }, m_viewManager.getScale());
+				bRet = DrawBitmap(iter->second.p);
 			}
 		}
 	}
@@ -608,7 +613,7 @@ void CMainWindow::initialiseMenuBar()
 void CMainWindow::menuOnOpenFile()
 {
 	static constexpr wchar_t s_fileFilter[] = L"*3.evsc*";
-	std::wstring selectedFilePath = win_dialogue::SelectOpenFile(L"script file", s_fileFilter, nullptr, m_hWnd);
+	std::wstring selectedFilePath = win_dialogue::SelectOpenFile(L"script file", s_fileFilter, L"Select a sctipt file under assetbundledatas/r18/adventure/eventdata", m_hWnd);
 	if (!selectedFilePath.empty())
 	{
 		bool bRet = setupScenario(selectedFilePath);
@@ -721,7 +726,7 @@ void CMainWindow::toggleWindowFrameStyle()
 
 		::SetWindowLong(m_hWnd, GWL_STYLE, lStyle & ~WS_CAPTION & ~WS_SYSMENU);
 		/* If GetMonitorInfoW failed, rcMonitor.left and rcMonitor.top remains zero, namely the origin of primary monitor. */
-		::SetWindowPos(m_hWnd, nullptr, monitorInfo.rcMonitor.left, monitorInfo.rcMonitor.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOZORDER);
+		::SetWindowPos(m_hWnd, nullptr, monitorInfo.rcWork.left, monitorInfo.rcWork.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOZORDER);
 		::SetMenu(m_hWnd, nullptr);
 	}
 	else
