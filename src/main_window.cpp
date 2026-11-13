@@ -106,6 +106,8 @@ LRESULT CMainWindow::handleMessage(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 		return onCreate(hWnd);
 	case WM_DESTROY:
 		return onDestroy();
+	case WM_SIZE:
+		return onSize();
 	case WM_CLOSE:
 		return onClose();
 	case WM_PAINT:
@@ -224,24 +226,40 @@ LRESULT CMainWindow::onPaint()
 
 	m_pD2ImageDrawer->clear();
 
-	bool bRet = false;
+	bool hasDrawn = false;
 	const adv::PaintDatum* pPaintDatum = getCurrentPaintData();
 	if (pPaintDatum != nullptr)
 	{
-		static const auto DrawBitmap = [this](ID2D1Bitmap* pD2d1Bitmap)
+		RECT rc;
+		::GetClientRect(m_hWnd, &rc);
+
+		const int targetWidth = rc.right - rc.left;
+		const int targetHeight = rc.bottom - rc.top;
+
+		const auto DrawBitmap = [&targetWidth, &targetHeight, this](ID2D1Bitmap* pD2d1Bitmap)
 			-> bool
 			{
+#if defined(LEFT_TOP_CORNER_SCALING)
 				return m_pD2ImageDrawer->scaledDraw(pD2d1Bitmap, {}, { m_viewManager.getOffsetX(), m_viewManager.getOffsetY() }, m_viewManager.getScale());
+#else
+				const D2D1_SIZE_U srcSize = pD2d1Bitmap->GetPixelSize();
+
+				const float fScale = m_viewManager.getScale();
+				const float fX = (srcSize.width * fScale - targetWidth) / 2.f + m_viewManager.getOffsetX() / 2;
+				const float fY = (srcSize.height * fScale - targetHeight) / 2.f + m_viewManager.getOffsetY() / 2;
+				
+				return m_pD2ImageDrawer->scaledDraw(pD2d1Bitmap, { -fX, -fY }, { }, fScale);
+#endif
 			};
 		if (pPaintDatum->isVideo)
 		{
 			CComPtr<ID2D1Bitmap> d2d1Bitmap;
 			long long frameTime = 0;
-			bRet = m_videoTransferor.transferVideoFrame(m_pD2ImageDrawer->getD2DeviceContext(), &d2d1Bitmap, &frameTime);
-			if (bRet)
+			hasDrawn = m_videoTransferor.transferVideoFrame(m_pD2ImageDrawer->getD2DeviceContext(), &d2d1Bitmap, &frameTime);
+			if (hasDrawn)
 			{
-				bRet = DrawBitmap(d2d1Bitmap.p);
-				if (bRet)
+				hasDrawn = DrawBitmap(d2d1Bitmap.p);
+				if (hasDrawn)
 				{
 					storeVideoFrame(frameTime, d2d1Bitmap);
 				}
@@ -252,7 +270,7 @@ LRESULT CMainWindow::onPaint()
 				ID2D1Bitmap* p = restoreVideoFrame(llCurrentTime);
 				if (p != nullptr)
 				{
-					bRet = DrawBitmap(p);
+					hasDrawn = DrawBitmap(p);
 				}
 			}
 		}
@@ -261,24 +279,20 @@ LRESULT CMainWindow::onPaint()
 			const auto& iter = m_imageMap.find(pPaintDatum->wstrFilePath);
 			if (iter != m_imageMap.cend())
 			{
-				bRet = DrawBitmap(iter->second.p);
+				hasDrawn = DrawBitmap(iter->second.p);
 			}
 		}
-	}
 
-	if (bRet)
-	{
-		if (!m_sceneState.isTextHidden)
+		if (hasDrawn)
 		{
-			RECT rc;
-			::GetClientRect(m_hWnd, &rc);
+			if (!m_sceneState.isTextHidden)
+			{
+				const float fontThickness = m_pD2TextWriter->getThickness();
 
-			const float targetWidth = static_cast<float>(rc.right - rc.left);
-			const float fontThickness = m_pD2TextWriter->getThickness();
-
-			m_pD2TextWriter->outLinedDraw(m_formattedText.c_str(), static_cast<unsigned long>(m_formattedText.size()), targetWidth, { fontThickness , fontThickness });
+				m_pD2TextWriter->outLinedDraw(m_formattedText.c_str(), static_cast<unsigned long>(m_formattedText.size()), static_cast<float>(targetWidth), { fontThickness , fontThickness });
+			}
+			m_pD2ImageDrawer->display();
 		}
-		m_pD2ImageDrawer->display();
 	}
 
 	::EndPaint(m_hWnd, &ps);
@@ -288,6 +302,10 @@ LRESULT CMainWindow::onPaint()
 /*WM_SIZE*/
 LRESULT CMainWindow::onSize()
 {
+	if (m_pD2ImageDrawer != nullptr)
+	{
+		m_pD2ImageDrawer->onResize();
+	}
 
 	return 0;
 }

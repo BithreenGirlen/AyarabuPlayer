@@ -27,6 +27,8 @@ public:
 
 	ID2D1Factory1* const getD2Factory()const { return m_pD2d1Factory1; }
 	ID2D1DeviceContext* const getD2DeviceContext()const { return m_pD2d1DeviceContext; }
+
+	void onResize() noexcept;
 private:
 	ID2D1Factory1* m_pD2d1Factory1 = nullptr;
 	ID2D1DeviceContext* m_pD2d1DeviceContext = nullptr;

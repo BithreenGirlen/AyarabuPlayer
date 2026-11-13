@@ -3,7 +3,7 @@
 
 #include <Windows.h>
 
-#define LEFT_TOP_CORNER_SCALING 1
+//#define LEFT_TOP_CORNER_SCALING 1
 
 class CViewManager
 {

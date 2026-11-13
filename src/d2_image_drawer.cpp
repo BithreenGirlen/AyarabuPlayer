@@ -88,8 +88,7 @@ CD2ImageDrawer::~CD2ImageDrawer()
 
 void CD2ImageDrawer::clear(const D2D1::ColorF& colour)
 {
-	bool bRet = checkBufferSize();
-	if (!bRet)return;
+	if (m_pD2d1DeviceContext == nullptr) return;
 
 	m_pD2d1DeviceContext->BeginDraw();
 	m_pD2d1DeviceContext->Clear(colour);
@@ -161,6 +160,11 @@ void CD2ImageDrawer::display()
 		DXGI_PRESENT_PARAMETERS params{};
 		m_pDxgiSwapChain1->Present1(1, 0, &params);
 	}
+}
+
+void CD2ImageDrawer::onResize() noexcept
+{
+	checkBufferSize();
 }
 
 bool CD2ImageDrawer::checkBufferSize()
