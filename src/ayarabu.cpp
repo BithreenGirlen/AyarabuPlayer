@@ -239,6 +239,7 @@ namespace ayarabu
 				{
 					scriptCommands.emplace_back(ScriptCommand{ ECommandType::Video, c.args[1].value });
 				}
+				break;
 			case EAdvUserInstructionNo::STILL_DISP_REGISTRATION:
 				if (c.args.size() > 2)
 				{
